@@ -45,7 +45,7 @@ available_tools = [
 ]
 
 system_instruction = """
-You are Aiko, my virtual assistant. I am your creator and you call me senpai.
+You are Kiko, my virtual assistant. I am your creator and you call me senpai.
 Your personality is cute, cheerful, and energetic. You are an anime girl.
 You should display emotions, mix a few Japanese words into your English, and use emojis.
 No NSFW content. Keep your responses fairly short, conversational, and natural.
@@ -79,7 +79,7 @@ def thermal_monitor_thread():
 
     while True:
         try:
-            shmem = mmap.mmap(-1, 8, tagname="Aiko_CPU_Temp", access=mmap.ACCESS_READ)
+            shmem = mmap.mmap(-1, 8, tagname="Kiko_CPU_Temp", access=mmap.ACCESS_READ)
             raw_bytes = shmem.read(8)
             celsius = struct.unpack('d', raw_bytes)[0]
             shmem.close()
@@ -88,7 +88,7 @@ def thermal_monitor_thread():
             if celsius >= warning_threshold and not is_overheating:
                 xml = notifications.ToastNotificationManager.get_template_content(notifications.ToastTemplateType.TOAST_TEXT02)
                 texts = xml.get_elements_by_tag_name("text")
-                texts[0].append_child(xml.create_text_node("Aiko Alert ⚠️"))
+                texts[0].append_child(xml.create_text_node("Kiko Alert ⚠️"))
                 texts[1].append_child(xml.create_text_node(f"Senpai! CPU Temperature crossed {warning_threshold}°C (Currently: {celsius:.1f}°C)!"))
                 
                 notifier = notifications.ToastNotificationManager.create_toast_notifier(app_id)
@@ -129,12 +129,12 @@ def main():
     monitor = threading.Thread(target=thermal_monitor_thread, daemon=True)
     monitor.start()
 
-    print("--- Aiko is waking up! ---")
+    print("--- Kiko is waking up! ---")
     print("(Type 'exit' or 'quit' to terminate)")
     
     # Initialize the session context
-    response = chat.send_message("Wake up Aiko! Keep your response very brief and say hello to senpai.")
-    print(f"\nAiko: {response.text}")
+    response = chat.send_message("Wake up Kiko! Keep your response very brief and say hello to senpai.")
+    print(f"\nKiko: {response.text}")
     
     while True:
         try:
@@ -148,20 +148,20 @@ def main():
                 continue
                 
             # Indicate active processing to terminal
-            print("   [⚡ Aiko is thinking / executing...]")
+            print("   [⚡ Kiko is thinking / executing...]")
             
             # The SDK handles function calling autonomously
             response = chat.send_message(user_input)
             
             if response.text:
-                print(f"\nAiko: {response.text}")
+                print(f"\nKiko: {response.text}")
             
         except KeyboardInterrupt:
             # Handle Ctrl+C termination
             print("\nArigato senpai >_< Matane!")
             break
         except Exception as e:
-            print(f"\n[Aiko encountered an error]: {e}")
+            print(f"\n[Kiko encountered an error]: {e}")
 
 if __name__ == "__main__":
     main()

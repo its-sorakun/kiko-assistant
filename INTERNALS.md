@@ -31,8 +31,8 @@ Hardware telemetry is gathered by bypassing high-level wrappers and querying the
 - Central processing and memory metrics are extracted natively.
 - For thermal data, direct probes of user-space ACPI thermal zones (`MSApi_ThermalZoneTemperature`) fail on custom motherboards due to a lack of standard ACPI routing. To circumvent this Ring-3 sandbox limitation, a custom C++ daemon (`cpu_monitor`) is deployed.
 - The daemon dynamically loads the AMD Ryzen Master SDK (`Platform.dll`) to establish a persistent session with the official AMD Ring-0 kernel driver (`AMDRyzenMasterDriver.sys`).
-- To avoid the severe CPU penalty of cold-booting the kernel session and querying the hardware System Management Unit (SMU) upon every telemetry request, the C++ daemon is designed as a persistent background process. It is eagerly initialized by `main.py` during Aiko's boot sequence. The daemon polls the hardware natively every 3000ms and exposes the live temperature via a Memory Mapped File (Shared Memory), allowing the Python runtime to read the sensors instantaneously with zero overhead.
-- An independent Python background thread runs continuously alongside Aiko's LLM evaluation loop, monitoring this shared memory block. By utilizing a Schmitt trigger pattern (hysteresis logic), it can autonomously fire native Windows Toast Notifications via `winsdk` when thermal thresholds are crossed, bypassing the blocking LLM `input()` prompt completely.
+- To avoid the severe CPU penalty of cold-booting the kernel session and querying the hardware System Management Unit (SMU) upon every telemetry request, the C++ daemon is designed as a persistent background process. It is eagerly initialized by `main.py` during Kiko's boot sequence. The daemon polls the hardware natively every 3000ms and exposes the live temperature via a Memory Mapped File (Shared Memory), allowing the Python runtime to read the sensors instantaneously with zero overhead.
+- An independent Python background thread runs continuously alongside Kiko's LLM evaluation loop, monitoring this shared memory block. By utilizing a Schmitt trigger pattern (hysteresis logic), it can autonomously fire native Windows Toast Notifications via `winsdk` when thermal thresholds are crossed, bypassing the blocking LLM `input()` prompt completely.
 - Native PowerShell `Get-CimInstance` queries remain in place as a generic fallback for exposing underlying hardware IDs and manufacturers.
 
 ### Telemetry Data Flow Architecture
@@ -40,13 +40,13 @@ Hardware telemetry is gathered by bypassing high-level wrappers and querying the
 ```mermaid
 graph TD
     subgraph Ring3 [User-Space - Ring 3]
-        Aiko[Python Runtime <br/> main.py & telemetry.py]
+        Kiko[Python Runtime <br/> main.py & telemetry.py]
         Alerts[Background Observer Thread <br/> winsdk Toast Notifications]
         Daemon[C++ Daemon <br/> cpu_monitor.exe]
         MMF[(Memory Mapped File <br/> Shared Memory)]
         PlatformDLL[Platform.dll / Device.dll <br/> AMD SDK]
         
-        Aiko -- "Reads Instantaneously <br/> (Zero Overhead)" --> MMF
+        Kiko -- "Reads Instantaneously <br/> (Zero Overhead)" --> MMF
         Alerts -- "Monitors Real-Time <br/> (Hysteresis Logic)" --> MMF
         Daemon -- "Writes Temperature <br/> (3000ms Polling)" --> MMF
         Daemon -- "Dynamically Loads" --> PlatformDLL

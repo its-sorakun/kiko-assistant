@@ -20,7 +20,7 @@ def get_system_stats() -> str:
         import struct
         
         # -1 maps to system paging file instead of a physical disk file
-        shmem = mmap.mmap(-1, 8, tagname="Aiko_CPU_Temp", access=mmap.ACCESS_READ)
+        shmem = mmap.mmap(-1, 8, tagname="Kiko_CPU_Temp", access=mmap.ACCESS_READ)
         
         # c++ daemon writes a double (8 bytes). 'd' unpacks to a python float.
         raw_bytes = shmem.read(8)

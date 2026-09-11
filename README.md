@@ -1,12 +1,12 @@
-# Aiko: Native OS-Aware Assistant
+# Kiko: Native OS-Aware Assistant
 
-Aiko is an experimental, event-driven virtual assistant designed to explore the intersection between modern Large Language Model (LLM) function calling and low-level Windows OS mechanics. 
+Kiko is an experimental, event-driven virtual assistant designed to explore the intersection between modern Large Language Model (LLM) function calling and low-level Windows OS mechanics. 
 
-Instead of treating the operating system as a black box and interacting via high-level graphical UI automation (like simulated mouse clicks or fragile OCR scraping), the project is engineered to drop down to the underlying mechanisms. Aiko interfaces directly with the native Win32 API, Windows Management Instrumentation (WMI), and the asynchronous Windows Runtime (WinRT).
+Instead of treating the operating system as a black box and interacting via high-level graphical UI automation (like simulated mouse clicks or fragile OCR scraping), the project is engineered to drop down to the underlying mechanisms. Kiko interfaces directly with the native Win32 API, Windows Management Instrumentation (WMI), and the asynchronous Windows Runtime (WinRT).
 
 > For a highly verbose breakdown of the specific kernel and user-space hooks employed, refer to [INTERNALS.md](INTERNALS.md).
 
-## What Aiko Can Do
+## What Kiko Can Do
 
 Because the assistant is hooked directly into the OS, it exposes several core features:
 - **System Media Inspection**: Extracts currently playing audio metadata directly from the WinRT DWM media session.
@@ -18,9 +18,9 @@ Because the assistant is hooked directly into the OS, it exposes several core fe
 
 ## How It Works (The Reasoning Engine)
 
-At the core of Aiko is the `google.genai` SDK, leveraging the Gemini 3.1 Flash Lite model.
+At the core of Kiko is the `google.genai` SDK, leveraging the Gemini 3.1 Flash Lite model.
 
-Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing or regex string matching, Aiko delegates all reasoning to the generative model. 
+Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing or regex string matching, Kiko delegates all reasoning to the generative model. 
 
 1. **Tool Schema Injection**: The local Python runtime defines a schema of available OS hooks (e.g., `control_system_media`, `get_active_window`, `force_kill_process`) and passes this to Gemini.
 2. **Dynamic Decision Making**: When a natural language command is provided (e.g., "Skip this song" or "Why is my PC running hot?"), Gemini determines exactly which native hook to invoke and extracts the necessary arguments.
@@ -29,8 +29,8 @@ Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing 
 
 ## Core Capabilities & Implementation Details
 
-- **DWM Z-Order Interception**: When queried about the user's active context, Aiko bypasses the invoking terminal. By traversing the Desktop Window Manager (DWM) Z-order stack downwards, she can ignore terminal wrappers and identify the true underlying foreground application, even intercepting bare desktop shells (`WorkerW`, `Progman`).
-- **WinRT Media Hooking (SMTC)**: Media control completely bypasses simulated keyboard media keys. Aiko hooks into the asynchronous WinRT System Media Transport Controls (SMTC) via the `winsdk` projection. This allows her to iterate through background audio sessions and pipe transport signals specifically to hidden background processes (like Spotify), bypassing dominant global media sessions.
+- **DWM Z-Order Interception**: When queried about the user's active context, Kiko bypasses the invoking terminal. By traversing the Desktop Window Manager (DWM) Z-order stack downwards, she can ignore terminal wrappers and identify the true underlying foreground application, even intercepting bare desktop shells (`WorkerW`, `Progman`).
+- **WinRT Media Hooking (SMTC)**: Media control completely bypasses simulated keyboard media keys. Kiko hooks into the asynchronous WinRT System Media Transport Controls (SMTC) via the `winsdk` projection. This allows her to iterate through background audio sessions and pipe transport signals specifically to hidden background processes (like Spotify), bypassing dominant global media sessions.
 - **Native Registry Resolution**: Applications are launched natively by crawling Windows Registry hives (`SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall` and `WOW6432Node`) to discover physical executable paths, rather than relying on environment variables or the `start` shell command.
 - **Direct Memory & Thermal Probing**: Hardware vitals are read via `psutil`. Thermal data extraction is attempted through Windows Management Instrumentation (WMI) ACPI hooks, exposing the limitations of user-space thermal diode access without Ring-0 drivers.
 - **Native Windows Toast Alerts**: Uses the `winsdk` to push native Windows Action Center notifications. A dedicated background thread continuously monitors the shared memory block, evaluating real-time thermal data against hysteresis logic (preventing notification spam) and issuing alerts immediately when safe thresholds are exceeded.
@@ -66,4 +66,4 @@ Execute the main script from your terminal:
 ```bash
 python main.py
 ```
-Aiko will initialize the chat session. You can immediately begin interacting via natural language commands to inspect your system, launch applications, or manipulate background media.
+Kiko will initialize the chat session. You can immediately begin interacting via natural language commands to inspect your system, launch applications, or manipulate background media.
