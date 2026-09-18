@@ -63,19 +63,22 @@ config = types.GenerateContentConfig(
 chat = client.chats.create(model=model_name, config=config)
 
 def thermal_monitor_thread():
-    # polling loop running alongside aiko's chat loop to proactively warn the user.
-    # uses native winsdk toast notifications to bypass the blocking input() prompt in the terminal.
+    # polling loop running alongside kiko's chat loop to proactively warn the user.
+    # uses a custom raw Win32 GDI overlay to bypass blocking prompts.
     import time
     import mmap
     import struct
-    import winsdk.windows.ui.notifications as notifications
+    import subprocess
+    import sys
+    import os
 
-    app_id = "{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\\WindowsPowerShell\\v1.0\\powershell.exe"
-    
     # State tracking to alert exactly when it crosses the threshold (edge-trigger)
     is_overheating = False
-    warning_threshold = 89.0
+    warning_threshold = 60.0  # Lowered for testing
     reset_threshold = warning_threshold - 2.0  # Hysteresis: must drop 2 degrees below to reset
+    
+    overlay_process = None
+    overlay_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "overlay.py")
 
     while True:
         try:
@@ -86,19 +89,14 @@ def thermal_monitor_thread():
 
             # Trigger alert if it crosses the threshold that aren't already in an overheated state
             if celsius >= warning_threshold and not is_overheating:
-                xml = notifications.ToastNotificationManager.get_template_content(notifications.ToastTemplateType.TOAST_TEXT02)
-                texts = xml.get_elements_by_tag_name("text")
-                texts[0].append_child(xml.create_text_node("Kiko Alert ⚠️"))
-                texts[1].append_child(xml.create_text_node(f"Senpai! CPU Temperature crossed {warning_threshold}°C (Currently: {celsius:.1f}°C)!"))
-                
-                notifier = notifications.ToastNotificationManager.create_toast_notifier(app_id)
-                toast = notifications.ToastNotification(xml)
-                notifier.show(toast)
-                
+                overlay_process = subprocess.Popen([sys.executable, overlay_script, f"{celsius:.1f}"])
                 is_overheating = True
                 
             # Only reset the state if the temp drops sufficiently below the threshold (prevent micro-bouncing spam)
             elif celsius < reset_threshold and is_overheating:
+                if overlay_process:
+                    overlay_process.terminate()
+                    overlay_process = None
                 is_overheating = False
                 
         except Exception:
