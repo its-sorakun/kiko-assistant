@@ -74,7 +74,7 @@ def thermal_monitor_thread():
 
     # State tracking to alert exactly when it crosses the threshold (edge-trigger)
     is_overheating = False
-    warning_threshold = 60.0  # Lowered for testing
+    warning_threshold = 89.0
     reset_threshold = warning_threshold - 2.0  # Hysteresis: must drop 2 degrees below to reset
     
     overlay_process = None
