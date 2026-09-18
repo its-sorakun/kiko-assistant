@@ -16,6 +16,7 @@ ztest.py
 test_vscode.py
 tools_backup.py
 test_smtc.ps1
+db/kiko_cortex.db
 
 # Visual Studio Build Artifacts (C++ cpu_monitor)
 .vs/
