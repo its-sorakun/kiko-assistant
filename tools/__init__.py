@@ -5,6 +5,7 @@ from .windowing import get_active_window, read_active_window_content, open_direc
 from .registry import query_registry_value
 from .media import control_system_media
 from .power import manage_power_state
+from .memory import memorize_preferences, get_all_preferences
 
 __all__ = [
     "launch_program", 
@@ -16,5 +17,7 @@ __all__ = [
     "force_kill_process",
     "read_active_window_content",
     "control_system_media",
-    "manage_power_state"
+    "manage_power_state",
+    "memorize_preferences",
+    "get_all_preferences"
 ]

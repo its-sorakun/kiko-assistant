@@ -17,3 +17,25 @@ con = sqlite3.connect(db_path)
 cur = con.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS core_preferences(key TEXT PRIMARY KEY, value TEXT)")
 cur.execute("CREATE TABLE IF NOT EXISTS semantic_memory(id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, vector BLOB, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)")
+
+def memorize_preferences(key: str, value: str):
+    """Memorize a core preference about senpai. Use this when senpai tells you to remember a personal preference."""
+    data = (key, value)
+    # insert or replace
+    cur.execute("""
+    INSERT OR REPLACE INTO core_preferences VALUES
+        (?, ?)
+    """, data)
+    con.commit()
+
+def get_all_preferences():
+    fetched_rows = cur.execute("SELECT * FROM core_preferences")
+    # return cur.fetchall()
+    final_output = []
+    for i in fetched_rows:
+        final_output.append({
+            "key": i[0],
+            "value": i[1]
+        })
+    return final_output
+        

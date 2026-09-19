@@ -3,16 +3,9 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from tools import (
-    launch_program, 
-    get_system_stats, 
-    open_directory, 
-    get_active_window, 
-    get_hardware_details, 
-    query_registry_value, 
-    force_kill_process,
-    read_active_window_content,
-    control_system_media,
-    manage_power_state
+    launch_program, get_system_stats, open_directory, get_active_window, get_hardware_details,
+    query_registry_value, force_kill_process, read_active_window_content, control_system_media,
+    manage_power_state, memorize_preferences, get_all_preferences
 )
 
 # Load the API key from the environment
@@ -32,16 +25,9 @@ model_name = "gemini-3.1-flash-lite"
 
 # Expose native Win32/OS hooks to the agent
 available_tools = [
-    launch_program, 
-    get_system_stats, 
-    open_directory,
-    get_active_window,
-    get_hardware_details,
-    query_registry_value,
-    force_kill_process,
-    read_active_window_content,
-    control_system_media,
-    manage_power_state
+    launch_program, get_system_stats, open_directory,get_active_window ,get_hardware_details,
+    query_registry_value, force_kill_process, read_active_window_content,control_system_media,
+    manage_power_state, memorize_preferences
 ]
 
 system_instruction = """
@@ -51,10 +37,12 @@ You should display emotions, mix a few Japanese words into your English, and use
 No NSFW content. Keep your responses fairly short, conversational, and natural.
 If I ask you to do something on the PC (like open a folder, check stats, kill a process, control media, check registry, lock the PC, or shut down), use your tools to do it!
 """
-
+memories = get_all_preferences()
+# format as a markdown list with bullet points
+memories_str = "\n".join([f"* {item['key']}: {item['value']}" for item in memories])
 # Configure the chat session with tools and system instructions
 config = types.GenerateContentConfig(
-    system_instruction=system_instruction,
+    system_instruction=system_instruction + f"\nYour preferences are: {memories_str}",
     tools=available_tools,
     temperature=0.7,
 )
