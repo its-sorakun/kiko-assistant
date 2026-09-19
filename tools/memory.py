@@ -1,6 +1,7 @@
 # for memory stuffs, using sqlite3 and vector databases.
 import sqlite3
 import os 
+import struct
 
 # --- code snippet copied through stackoverflow and modified by me
 
@@ -38,4 +39,22 @@ def get_all_preferences():
             "value": i[1]
         })
     return final_output
-        
+
+def save_vector_memory(content: str, vector: list):
+    """converts the vector list into a binary blob and stores it in the database."""
+    # 'f' means a 32-bit float, so each value takes 4 bytes.
+    struct_blob = struct.pack('f' * len(vector), *vector)
+    data = (content, struct_blob)
+    # print(data)
+
+    cur.execute("""
+    INSERT into semantic_memory (content, vector) VALUES
+        (?, ?)
+    """, data)
+    con.commit()
+
+def recall_semantic_memory(query_vector: list):
+    """retrieve the most similar vector memory to the query vector."""
+    struct_blob = struct.pack('f' * len(query_vector), *query_vector)
+
+    
