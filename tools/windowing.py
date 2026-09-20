@@ -73,7 +73,7 @@ def read_active_window_content() -> str:
     GW_HWNDNEXT = 2
     
     # Target known IDE/Editor signatures in window titles
-    editor_signatures = ["Visual Studio Code", "Notepad", "Sublime Text", "Cursor"]
+    editor_signatures = ["Visual Studio Code", "Notepad", "Sublime Text", "Cursor", "Antigravity"]
     found_title = None
     
     # Crawl the Z-order to hunt down the nearest running code editor
@@ -109,7 +109,8 @@ def read_active_window_content() -> str:
     for part in parts:
         clean_part = part.strip().lstrip('*') # Strip the unsaved changes asterisk
         if "." in clean_part or clean_part.startswith("."):
-            raw_filename = clean_part
+            # Extract just the filename in case the IDE title contains the full absolute path
+            raw_filename = os.path.basename(clean_part.replace("\\", "/"))
             break
             
     if not raw_filename:
