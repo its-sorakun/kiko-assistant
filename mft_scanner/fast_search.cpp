@@ -38,6 +38,21 @@ int wmain(int argc, wchar_t *argv[]) {
     USN_RECORD_V2 *record = NULL;
     DWORDLONG next_frn = 0;
     
+    // Tokenize the search query by spaces for fuzzy multi-keyword matching
+    wchar_t query_copy[MAX_PATH];
+    wcsncpy_s(query_copy, MAX_PATH, argv[2], MAX_PATH);
+    _wcslwr_s(query_copy, MAX_PATH);
+    
+    wchar_t* context = NULL;
+    wchar_t* tokens[32];
+    int token_count = 0;
+    
+    wchar_t* token = wcstok_s(query_copy, L" ", &context);
+    while (token != NULL && token_count < 32) {
+        tokens[token_count++] = token;
+        token = wcstok_s(NULL, L" ", &context);
+    }
+
     wprintf(L"Scanning MFT on %s for '%s'...\n", argv[1], argv[2]);
 
     // FSCTL_ENUM_USN_DATA reads raw MFT entries directly from disk sectors, ignoring directory structures.
@@ -58,7 +73,20 @@ int wmain(int argc, wchar_t *argv[]) {
                     wcsncpy_s(current_name, MAX_PATH, (wchar_t*)((BYTE*)record + record->FileNameOffset), name_chars);
                     current_name[name_chars] = L'\0';
                     
-                    if (_wcsicmp(current_name, argv[2]) == 0) {
+                    // Convert to lowercase for case-insensitive matching
+                    wchar_t lower_name[MAX_PATH];
+                    wcsncpy_s(lower_name, MAX_PATH, current_name, MAX_PATH);
+                    _wcslwr_s(lower_name, MAX_PATH);
+                    
+                    bool all_tokens_match = true;
+                    for (int i = 0; i < token_count; i++) {
+                        if (wcsstr(lower_name, tokens[i]) == NULL) {
+                            all_tokens_match = false;
+                            break;
+                        }
+                    }
+                    
+                    if (all_tokens_match) {
                         FILE_ID_DESCRIPTOR fid = {0};
                         fid.dwSize = sizeof(FILE_ID_DESCRIPTOR);
                         fid.Type = FileIdType;
