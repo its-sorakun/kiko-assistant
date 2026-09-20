@@ -14,6 +14,25 @@ def open_directory(folder_path: str) -> str:
     else:
         return f"Target directory does not exist: {folder_path}"
 
+def list_directory_contents(folder_path: str) -> str:
+    """
+    List all files and subdirectories inside a given folder, returning the result as text.
+    Use this to 'see' what is inside a folder without opening it visually.
+    """
+    if not os.path.exists(folder_path):
+        return f"Target directory does not exist: {folder_path}"
+    
+    try:
+        entries = os.listdir(folder_path)
+        if not entries:
+            return f"The directory '{folder_path}' is empty."
+        
+        return f"Contents of '{folder_path}':\n" + "\n".join(f"- {e}" for e in entries)
+    except PermissionError:
+        return f"Access Denied: Windows is preventing you from reading '{folder_path}'."
+    except Exception as e:
+        return f"Failed to list contents: {str(e)}"
+
 def get_active_window() -> str:
     """
     Traverse the Desktop Window Manager Z-order stack to find the active application window.
