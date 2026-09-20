@@ -150,7 +150,10 @@ def main():
 
             augmented_prompt = user_input
             if memory_match:
+                # print(f"\n RAG Engine found a Cosine Similarity match.")
+                # print(f" Context Injected: {memory_match}")
                 augmented_prompt = f"Context from past conversation:\n{memory_match}\n\nUser: {user_input}"
+
                 
             # Indicate active processing to terminal
             print("   [⚡ Kiko is thinking / executing...]")
