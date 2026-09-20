@@ -15,7 +15,7 @@ Because the assistant is hooked directly into the OS, it exposes several core fe
 - **Native Application Launching**: Resolves physical executables via Registry Uninstall hives and spawns them as detached processes.
 - **Kernel-Level Process Termination**: Drops `taskkill /F` signals to forcefully clear hung or unresponsive processes from memory.
 - **Context-Aware File Reading**: Crawls the Z-order stack to identify the active code editor, parses the window title, and reads the raw file from disk.
-- **Autonomous Web Scraping**: Bypasses AI hallucinations by autonomously browsing the live internet. Fetches real-time facts and search snippets directly via `lite.duckduckgo.com` and custom Python HTML parsing, evading restrictive bot-protection firewalls.
+- **Autonomous Web Scraping & Deep-Dive Crawling**: Bypasses AI hallucinations by autonomously browsing the live internet. Fetches real-time search snippets via `lite.duckduckgo.com` and automatically deep-dives into target URLs to extract in-depth text content using event-driven HTML state machines.
 
 ## How It Works (The Reasoning Engine)
 
@@ -36,7 +36,7 @@ Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing 
 - **Direct Memory & Thermal Probing**: Hardware vitals are read via `psutil`. Thermal data extraction is attempted through Windows Management Instrumentation (WMI) ACPI hooks, exposing the limitations of user-space thermal diode access without Ring-0 drivers.
 - **Native Windows Toast Alerts**: Uses the `winsdk` to push native Windows Action Center notifications. A dedicated background thread continuously monitors the shared memory block, evaluating real-time thermal data against hysteresis logic (preventing notification spam) and issuing alerts immediately when safe thresholds are exceeded.
 - **Kernel-Level Termination**: Applications are closed by dropping kernel-level termination signals (`taskkill /F`), forcefully removing hung or unresponsive processes from memory rather than issuing polite GUI close requests.
-- **Autonomous Web Scraping & Bot Evasion**: Bypasses the need for expensive third-party search APIs. Kiko utilizes the Python standard library to construct a raw HTTP state-machine parser. By targeting the lightweight `lite.duckduckgo.com` POST endpoint and rotating randomly generated `User-Agent` headers on every request, the scraper successfully evades IP-based CAPTCHA blocks and extracts live search snippets directly from the DOM.
+- **Autonomous Web Scraping & Bot Evasion**: Bypasses the need for expensive third-party search APIs. Kiko utilizes the Python standard library to construct a two-stage raw HTTP state-machine parser. By targeting the lightweight `lite.duckduckgo.com` POST endpoint and rotating randomly generated `User-Agent` headers, the scraper evades CAPTCHA blocks. A secondary crawler deep-dives into the top target URL, actively stripping backend DOM code on the fly to feed pure context directly into the LLM.
 - **Native RAG Vector Engine**: Long-term conversational memory is implemented completely from scratch without external frameworks like Langchain or ChromaDB. 3072-dimensional embeddings are packed into raw C-level binary blobs via the `struct` module and stored in a native SQLite database. Contextual retrieval is executed via a pure-Python Cosine Similarity scan across the vector table.
 
 ## Configuration & Usage
