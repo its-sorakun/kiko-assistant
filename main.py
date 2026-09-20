@@ -23,7 +23,7 @@ if not api_key or api_key == "your_new_api_key_goes_here":
 client = genai.Client(api_key=api_key)
 
 # Model configuration
-model_name = "gemini-3.1-flash-lite"
+model_name = "gemini-3.5-flash-lite"
 
 # Expose native Win32/OS hooks to the agent
 available_tools = [
