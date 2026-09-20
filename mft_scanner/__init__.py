@@ -10,6 +10,7 @@ def perform_global_search(filename: str) -> str:
         return f"CRITICAL ERROR: Native MFT scanner executable not found at {exe_path}. Compilation required."
 
     try:
+        print(f"   [⚡ Kiko is scanning the Master File Table for: '{filename}'...]")
         # Capture stdout as text to parse the raw Win32 console output directly
         result = subprocess.run(
             [exe_path, "C:", filename],
