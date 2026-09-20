@@ -59,7 +59,30 @@ int wmain(int argc, wchar_t *argv[]) {
                     current_name[name_chars] = L'\0';
                     
                     if (_wcsicmp(current_name, argv[2]) == 0) {
-                        wprintf(L"[MATCH] %s (File ID: %llu, Parent ID: %llu)\n", current_name, record->FileReferenceNumber, record->ParentFileReferenceNumber);
+                        FILE_ID_DESCRIPTOR fid = {0};
+                        fid.dwSize = sizeof(FILE_ID_DESCRIPTOR);
+                        fid.Type = FileIdType;
+                        fid.FileId.QuadPart = record->FileReferenceNumber;
+                        
+                        // Open the file by its internal MFT ID to resolve the full absolute path.
+                        HANDLE hFile = OpenFileById(hVol, &fid, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, FILE_FLAG_BACKUP_SEMANTICS);
+                        
+                        if (hFile != INVALID_HANDLE_VALUE) {
+                            wchar_t final_path[MAX_PATH];
+                            if (GetFinalPathNameByHandleW(hFile, final_path, MAX_PATH, FILE_NAME_NORMALIZED)) {
+                                wchar_t* clean_path = final_path;
+                                // Strip the "\\\\?\\" prefix returned by the NT kernel for cleaner output.
+                                if (wcsncmp(final_path, L"\\\\?\\", 4) == 0) {
+                                    clean_path += 4;
+                                }
+                                wprintf(L"[MATCH] %s\n", clean_path);
+                            } else {
+                                wprintf(L"[MATCH] %s (Path resolution failed, File ID: %llu)\n", current_name, record->FileReferenceNumber);
+                            }
+                            CloseHandle(hFile);
+                        } else {
+                            wprintf(L"[MATCH] %s (Access denied/locked, File ID: %llu, Error: %lu)\n", current_name, record->FileReferenceNumber, GetLastError());
+                        }
                     }
                 }
             }
