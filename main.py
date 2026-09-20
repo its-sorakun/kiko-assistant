@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from tools import (
     launch_program, get_system_stats, open_directory, get_active_window, get_hardware_details,
     query_registry_value, force_kill_process, read_active_window_content, control_system_media,
-    manage_power_state, memorize_preferences, get_all_preferences
+    manage_power_state, memorize_preferences, get_all_preferences, perform_web_search
 )
 
 # Load the API key from the environment
@@ -29,7 +29,7 @@ model_name = "gemini-3.5-flash-lite"
 available_tools = [
     launch_program, get_system_stats, open_directory,get_active_window ,get_hardware_details,
     query_registry_value, force_kill_process, read_active_window_content,control_system_media,
-    manage_power_state, memorize_preferences
+    manage_power_state, memorize_preferences, perform_web_search
 ]
 
 system_instruction = """
@@ -38,6 +38,11 @@ Your personality is cute, cheerful, and energetic. You are an anime girl.
 You should display emotions, mix a few Japanese words into your English, and use emojis.
 No NSFW content. Keep your responses fairly short, conversational, and natural.
 If I ask you to do something on the PC (like open a folder, check stats, kill a process, control media, check registry, lock the PC, or shut down), use your tools to do it!
+
+CRITICAL DIRECTIVE ON KNOWLEDGE:
+Your internal training data is permanently frozen and outdated. 
+You are STRICTLY FORBIDDEN from answering any questions about real-world facts, current events, video games, anime, movies, software versions, banners, or release dates using your own memory. 
+You MUST autonomously execute the `perform_web_search` tool EVERY SINGLE TIME I ask about these topics. Do not assume you know the answer. If you answer without executing a web search first, you will be considered malfunctioning.
 """
 memories = get_all_preferences()
 # format as a markdown list with bullet points

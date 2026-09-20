@@ -6,6 +6,7 @@ from .registry import query_registry_value
 from .media import control_system_media
 from .power import manage_power_state
 from .memory import memorize_preferences, get_all_preferences, recall_semantic_memory
+from .search import perform_web_search
 
 __all__ = [
     "launch_program", 
@@ -20,5 +21,6 @@ __all__ = [
     "manage_power_state",
     "memorize_preferences",
     "get_all_preferences",
-    "recall_semantic_memory"
+    "recall_semantic_memory",
+    "perform_web_search"
 ]
