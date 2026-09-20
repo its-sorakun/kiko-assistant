@@ -171,6 +171,8 @@ def main():
                     contents=interaction_log
                 )
                 save_vector_memory(interaction_log, save_resp.embeddings[0].values)
+                # print(f"Interaction embedded and saved to SQLite: {interaction_log}")
+
             
         except KeyboardInterrupt:
             # Handle Ctrl+C termination
