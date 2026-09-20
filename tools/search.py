@@ -75,7 +75,8 @@ def perform_web_search(query: str) -> str:
 
     # Load user agents from JSON file
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(current_dir, 'user_agents.json')
+    project_root = os.path.dirname(current_dir)
+    json_path = os.path.join(project_root, 'user_agents.json')
     try:
         with open(json_path, 'r', encoding='utf-8') as f:
             user_agents = json.load(f)
