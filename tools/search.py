@@ -50,9 +50,8 @@ class DuckDuckGoParser(HTMLParser):
         # get the link from result-link class
         if tag == "a" and attrs.get("class") == "result-link":
             href = attrs.get("href")
-            if href:
-                # print(href)
-                # got the URL from href
+            if href and "duckduckgo.com" not in href:
+                # got the organic URL from href (ignoring sponsored ad trackers)
                 self.urls.append(href)
                 
     # fires every time the parser sees raw text
