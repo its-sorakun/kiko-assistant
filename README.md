@@ -35,6 +35,7 @@ Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing 
 - **Direct Memory & Thermal Probing**: Hardware vitals are read via `psutil`. Thermal data extraction is attempted through Windows Management Instrumentation (WMI) ACPI hooks, exposing the limitations of user-space thermal diode access without Ring-0 drivers.
 - **Native Windows Toast Alerts**: Uses the `winsdk` to push native Windows Action Center notifications. A dedicated background thread continuously monitors the shared memory block, evaluating real-time thermal data against hysteresis logic (preventing notification spam) and issuing alerts immediately when safe thresholds are exceeded.
 - **Kernel-Level Termination**: Applications are closed by dropping kernel-level termination signals (`taskkill /F`), forcefully removing hung or unresponsive processes from memory rather than issuing polite GUI close requests.
+- **Native RAG Vector Engine**: Long-term conversational memory is implemented completely from scratch without external frameworks like Langchain or ChromaDB. 3072-dimensional embeddings are packed into raw C-level binary blobs via the `struct` module and stored in a native SQLite database. Contextual retrieval is executed via a pure-Python Cosine Similarity scan across the vector table.
 
 ## Configuration & Usage
 

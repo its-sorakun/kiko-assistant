@@ -79,3 +79,11 @@ Relying on the `start` shell command triggers GUI error dialogs when an executab
 2. Upon failure, local machine and user Registry hives (`SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall` and WOW6432Node) are crawled.
 3. Iterating through Uninstall keys, `DisplayIcon` or `InstallLocation` string values are read to deduce the physical path of the binary on disk.
 4. A detached GUI process is spawned (`creationflags=0x00000008`), preventing the spawned application from inheriting file handles and deadlocking the terminal.
+
+## 7. Hybrid Memory Cortex (Native RAG)
+**File:** `tools/memory.py`
+
+To provide long-term state across sessions, Kiko utilizes a dual-layer SQLite memory architecture, intentionally bypassing abstracted vector frameworks like Langchain or ChromaDB to keep the mechanical process transparent.
+- **Explicit Identity Store:** A traditional Key-Value table (`core_preferences`) persists explicit facts about the user. These can be retrieved dynamically or injected into the system prompt upon boot.
+- **Fuzzy Semantic Engine (RAG):** Conversational history is continuously embedded via the Gemini API (generating 3072-dimensional arrays). The resulting float arrays are packed into raw C-level binary BLOBs using `struct.pack('f' * 3072, ...)` and committed to the `semantic_memory` table.
+- **Native Retrieval:** Upon each user prompt, the query is embedded and evaluated against the database using a brute-force linear Cosine Similarity scan in pure Python. The dot-product and magnitude calculations isolate the most contextually relevant historical exchange, which is seamlessly injected into the LLM's context window prior to generating a response.
