@@ -87,3 +87,12 @@ To provide long-term state across sessions, Kiko utilizes a dual-layer SQLite me
 - **Explicit Identity Store:** A traditional Key-Value table (`core_preferences`) persists explicit facts about the user. These can be retrieved dynamically or injected into the system prompt upon boot.
 - **Fuzzy Semantic Engine (RAG):** Conversational history is continuously embedded via the Gemini API (generating 3072-dimensional arrays). The resulting float arrays are packed into raw C-level binary BLOBs using `struct.pack('f' * 3072, ...)` and committed to the `semantic_memory` table.
 - **Native Retrieval:** Upon each user prompt, the query is embedded and evaluated against the database using a brute-force linear Cosine Similarity scan in pure Python. The dot-product and magnitude calculations isolate the most contextually relevant historical exchange, which is seamlessly injected into the LLM's context window prior to generating a response.
+
+## 8. Autonomous Web Scraping & Bot Evasion
+**File:** `tools/search.py`
+
+To circumvent LLM hallucinations without relying on expensive, rate-limited third-party search APIs (like SerpAPI), Kiko is equipped with a custom-built, standard-library scraper.
+- **Bot Evasion:** Standard `GET` requests to modern search engines quickly result in IP-based CAPTCHA blocks (Cloudflare anomaly pages). To bypass this, the scraper targets the ultra-lightweight `lite.duckduckgo.com/lite/` endpoint using `POST` requests and URL-encoded query payloads.
+- **Header Rotation:** A local dictionary of diverse `User-Agent` strings (`tools/user_agents.json`) is maintained. A random UA is injected into the HTTP headers for every request to further obfuscate the scraping activity and simulate real browser heterogeneity.
+- **State-Machine HTML Parsing:** Abstracted dependencies like `BeautifulSoup` are purposefully avoided. Instead, a custom state machine inherits from the standard library `html.parser.HTMLParser`. As the raw DOM stream is ingested, the engine dynamically tracks `<td>` tags possessing the `result-snippet` class. 
+- **Fragment Buffering:** Because `HTMLParser` fractures data streams upon encountering inner semantic tags (like `<b>` elements highlighting search terms), the state machine actively buffers raw string fragments into a continuous block in memory. It only appends the finalized, assembled snippet to the results array once the enclosing `<td>` tag formally terminates.
