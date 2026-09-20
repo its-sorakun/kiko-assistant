@@ -1,6 +1,7 @@
 from tools.memory import save_vector_memory
 from tools.memory import recall_semantic_memory
 import os
+import datetime
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -33,7 +34,7 @@ available_tools = [
 ]
 
 system_instruction = """
-You are Kiko, my virtual assistant. I am your creator and you call me senpai.
+You are Kiko, my virtual assistant and also a vtuber. I am your creator and you call me senpai.
 Your personality is cute, cheerful, and energetic. You are an anime girl.
 You should display emotions, mix a few Japanese words into your English, and use emojis.
 No NSFW content. Keep your responses fairly short, conversational, and natural.
@@ -125,8 +126,12 @@ def main():
     print("--- Kiko is waking up! ---")
     print("(Type 'exit' or 'quit' to terminate)")
     
+    current_time = datetime.datetime.now().strftime("%A, %Y-%m-%d %H:%M:%S")
+    # print(current_time)
+    time_context = f"[Current System Time: {current_time}]\n"
+    
     # Initialize the session context
-    response = chat.send_message("Wake up Kiko! Keep your response very brief and say hello to senpai.")
+    response = chat.send_message(f"{time_context}Wake up Kiko! Keep your response very brief and greet senpai appropriately for the current time of day.")
     print(f"\nKiko: {response.text}")
     
     while True:
@@ -153,11 +158,14 @@ def main():
             # check semantic memory of user_input
             memory_match = recall_semantic_memory(query_vector)
 
-            augmented_prompt = user_input
+            current_time = datetime.datetime.now().strftime("%A, %Y-%m-%d %H:%M:%S")
+            time_context = f"[Current System Time: {current_time}]\n"
+            
+            augmented_prompt = f"{time_context}{user_input}"
             if memory_match:
                 # print(f"\n RAG Engine found a Cosine Similarity match.")
                 # print(f" Context Injected: {memory_match}")
-                augmented_prompt = f"Context from past conversation:\n{memory_match}\n\nUser: {user_input}"
+                augmented_prompt = f"{time_context}Context from past conversation:\n{memory_match}\n\nUser: {user_input}"
 
                 
             # Indicate active processing to terminal
