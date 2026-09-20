@@ -15,6 +15,7 @@ Because the assistant is hooked directly into the OS, it exposes several core fe
 - **Native Application Launching**: Resolves physical executables via Registry Uninstall hives and spawns them as detached processes.
 - **Kernel-Level Process Termination**: Drops `taskkill /F` signals to forcefully clear hung or unresponsive processes from memory.
 - **Context-Aware File Reading**: Crawls the Z-order stack to identify the active code editor, parses the window title, and reads the raw file from disk.
+- **Silent Filesystem Inspection**: Enables the assistant to query directory structures natively and ingest folder contents directly into its LLM context without relying on visual Windows Explorer windows.
 - **Autonomous Web Scraping & Deep-Dive Crawling**: Bypasses AI hallucinations by autonomously browsing the live internet. Fetches real-time search snippets via `lite.duckduckgo.com` and automatically deep-dives into target URLs to extract in-depth text content using event-driven HTML state machines.
 
 ## How It Works (The Reasoning Engine)

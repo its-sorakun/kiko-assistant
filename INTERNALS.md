@@ -106,3 +106,11 @@ To provide instantaneous, system-wide file search without relying on the slow Wi
 - **Kernel-Level MFT Access**: A custom C++ executable leverages `DeviceIoControl` with `FSCTL_ENUM_USN_DATA` to read raw MFT entries directly from disk sectors, entirely bypassing high-level user-space directory traversal.
 - **Path Resolution**: Because `FSCTL_ENUM_USN_DATA` returns raw 64-bit File Reference Numbers (FRNs) without directory hierarchy, the scanner dynamically translates FRNs into absolute paths by combining `OpenFileById` (with `FILE_FLAG_BACKUP_SEMANTICS`) and `GetFinalPathNameByHandleW`. 
 - **Tokenized Fuzzy Substring Search**: Rather than enforcing exact string matches, the search query is fractured into lowercase tokens. The scanner sequentially streams through the raw byte buffer of the MFT in memory, performing a multi-keyword fuzzy substring match against every file record. This allows Kiko to resolve complex user requests (e.g., "devops resume") into exact physical files (e.g., `RajatRaj_Resume_DevOps.pdf`) instantaneously.
+
+## 10. Silent Filesystem Inspection
+**File:** `tools/windowing.py` -> `list_directory_contents()`
+
+Rather than aggressively launching visual GUI windows (via `os.startfile`) every time Kiko needs to examine a directory, a discrete parsing tool allows her to ingest folder contents silently.
+- Queries `os.listdir()` to enumerate physical file entries.
+- Returns a raw text payload directly into the LLM's context window.
+- **Contextual Optimization Loop**: If the LLM observes that a requested target file rests in the currently inspected directory, it bypasses the heavy global MFT scan. It constructs the absolute path natively in-memory and launches the target file instantaneously with zero intermediate graphical disruption.
