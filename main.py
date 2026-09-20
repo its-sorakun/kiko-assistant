@@ -105,6 +105,9 @@ def main():
     # boot the c++ hardware monitoring daemon silently in the background before aiko wakes up
     import subprocess
     
+    # Kill any orphaned instances from previous script restarts before spawning a new one
+    subprocess.run(["taskkill", "/F", "/IM", "cpu_monitor.exe"], capture_output=True)
+    
     base_dir = os.path.dirname(os.path.abspath(__file__))
     daemon_dir = os.path.join(base_dir, "cpu_monitor", "cpu_monitor", "x64", "Debug")
     daemon_path = os.path.join(daemon_dir, "cpu_monitor.exe")
