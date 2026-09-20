@@ -1,3 +1,5 @@
+from tools.memory import save_vector_memory
+from tools.memory import recall_semantic_memory
 import os
 from google import genai
 from google.genai import types
@@ -126,21 +128,46 @@ def main():
         try:
             user_input = input("\n> ")
             
+            # Exit the loop if the user types 'exit' or 'quit'
             if user_input.lower() in ['exit', 'quit']:
                 print("Matane, senpai! See you later!")
                 break
-                
+            
             if not user_input.strip():
                 continue
+            
+            # convert user_input into a vector embedding
+            embedding_response = client.models.embed_content(
+                model='gemini-embedding-2',
+                contents=user_input
+            )
+
+            # retrieve the most similar vector memory to the query vector
+            query_vector = embedding_response.embeddings[0].values
+
+            # check semantic memory of user_input
+            memory_match = recall_semantic_memory(query_vector)
+
+            augmented_prompt = user_input
+            if memory_match:
+                augmented_prompt = f"Context from past conversation:\n{memory_match}\n\nUser: {user_input}"
                 
             # Indicate active processing to terminal
             print("   [⚡ Kiko is thinking / executing...]")
             
             # The SDK handles function calling autonomously
-            response = chat.send_message(user_input)
+            response = chat.send_message(augmented_prompt)
             
             if response.text:
                 print(f"\nKiko: {response.text}")
+                
+                # embed and save the interaction memory
+                interaction_log = f"User: {user_input}\nKiko: {response.text}"
+                save_resp = client.models.embed_content(
+                    model='gemini-embedding-2',
+                    contents=interaction_log
+                )
+                save_vector_memory(interaction_log, save_resp.embeddings[0].values)
             
         except KeyboardInterrupt:
             # Handle Ctrl+C termination

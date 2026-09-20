@@ -2,6 +2,7 @@
 import sqlite3
 import os 
 import struct
+import math
 
 # --- code snippet copied through stackoverflow and modified by me
 
@@ -10,7 +11,9 @@ import struct
 # Retrieved 2026-09-19, License - CC BY-SA 4.0
 
 get_current_path = os.path.dirname(os.path.realpath(__file__))
+
 # ---
+
 db_path = os.path.join(get_current_path, '..', 'db', 'kiko_cortex.db')
 con = sqlite3.connect(db_path)
 
@@ -55,6 +58,29 @@ def save_vector_memory(content: str, vector: list):
 
 def recall_semantic_memory(query_vector: list):
     """retrieve the most similar vector memory to the query vector."""
-    struct_blob = struct.pack('f' * len(query_vector), *query_vector)
+    retrieved_data = cur.execute("SELECT content, vector FROM semantic_memory")
 
-    
+    best_score = -1.0
+    best_content = None
+
+    for i in retrieved_data:
+        content = i[0]
+        vector = struct.unpack('f' * 3072, i[1])
+        
+        # calculate cosine similarity between query_vector and vector
+        dot_product = sum(a * b for a, b in zip(query_vector, vector))
+        magnitude_query = math.sqrt(sum(a * a for a in query_vector))
+        magnitude_vector = math.sqrt(sum(b * b for b in vector))
+        
+        if magnitude_query == 0 or magnitude_vector == 0:
+            similarity = 0
+        else:
+            similarity = dot_product / (magnitude_query * magnitude_vector)
+            
+        if similarity > best_score:
+            best_score = similarity
+            best_content = content
+            
+    if best_score > 0.65:
+        return best_content
+    return None
