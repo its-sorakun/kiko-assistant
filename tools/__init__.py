@@ -7,6 +7,7 @@ from .media import control_system_media
 from .power import manage_power_state
 from .memory import memorize_preferences, get_all_preferences, recall_semantic_memory
 from .search import perform_web_search
+from .pdf_rag import advanced_pdf_query
 
 __all__ = [
     "launch_program", 
@@ -24,5 +25,6 @@ __all__ = [
     "recall_semantic_memory",
     "perform_web_search",
     "list_directory_contents",
-    "open_file"
+    "open_file",
+    "advanced_pdf_query"
 ]
