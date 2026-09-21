@@ -99,80 +99,140 @@ def get_active_window() -> str:
 
 def read_active_window_content() -> str:
     """
-    Attempt to read the contents of the currently active editor window.
-    Instead of relying on bloated UI automation frameworks, this intercepts the DWM Z-order 
-    to extract the window title, parses the active filename, and pulls the raw bytes directly from the physical disk.
+    Attempt to read the contents of the currently active window.
+    For code editors, it deduces the filename and reads directly from disk for instant speed.
+    For all other GUI applications (browsers, discord, etc.), it hooks into the native Microsoft
+    UI Automation API to scrape the visible accessibility text tree.
     """
     user32 = ctypes.windll.user32
     hwnd = user32.GetForegroundWindow()
     GW_HWNDNEXT = 2
     
-    # Target known IDE/Editor signatures in window titles
     editor_signatures = ["Visual Studio Code", "Notepad", "Sublime Text", "Cursor", "Antigravity"]
-    found_title = None
+    found_editor_title = None
+    target_hwnd = None
+    fallback_title = None
     
-    # Crawl the Z-order to hunt down the nearest running code editor
+    current_pid = os.getpid()
+    
+    # Crawl the Z-order to hunt down the nearest running app
     for _ in range(50):
         if not hwnd: break
         
         # Only check visible, non-minimized windows
         if user32.IsWindowVisible(hwnd) and not user32.IsIconic(hwnd):
-            length = user32.GetWindowTextLengthW(hwnd)
-            if length > 0:
-                title_buf = ctypes.create_unicode_buffer(length + 1)
-                user32.GetWindowTextW(hwnd, title_buf, length + 1)
-                window_title = title_buf.value
+            # Check if this window belongs to us (the terminal)
+            pid = ctypes.c_ulong()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            
+            try:
+                proc = psutil.Process(pid.value)
+                proc_name = proc.name().lower()
+            except:
+                proc_name = ""
                 
-                # Check if this window belongs to a known editor
-                if any(sig in window_title for sig in editor_signatures):
-                    found_title = window_title
-                    break
+            if pid.value == current_pid or "cmd.exe" in proc_name or "windowsterminal.exe" in proc_name:
+                pass # skip terminal wrapper
+            else:
+                length = user32.GetWindowTextLengthW(hwnd)
+                if length > 0:
+                    title_buf = ctypes.create_unicode_buffer(length + 1)
+                    user32.GetWindowTextW(hwnd, title_buf, length + 1)
+                    window_title = title_buf.value
+                    
+                    # Ignore the raw desktop shell
+                    cls_buf = ctypes.create_unicode_buffer(256)
+                    user32.GetClassNameW(hwnd, cls_buf, 256)
+                    if cls_buf.value not in ("WorkerW", "Progman"):
+                        if not target_hwnd:
+                            target_hwnd = hwnd
+                            fallback_title = window_title
+                        
+                        # Check if this window belongs to a known editor
+                        if any(sig in window_title for sig in editor_signatures):
+                            found_editor_title = window_title
+                            target_hwnd = hwnd # prioritize editor if found
+                            break
                     
         hwnd = user32.GetWindow(hwnd, GW_HWNDNEXT)
         
-    if not found_title:
-        return "Could not find any active (non-minimized) code editors in the Z-order stack to read from."
+    if not target_hwnd:
+        return "Could not find any active (non-minimized) GUI applications in the Z-order stack."
         
-    # Parse common editor window title structures (e.g. "filename.py - workspace - Visual Studio Code" or "workspace - filename.py")
-    parts = found_title.split(" - ")
-    if not parts:
-        return f"Window title too ambiguous to deduce filename: {found_title}"
-        
-    # The filename could be anywhere in the title depending on the IDE config.
-    # iterate through the parts and find the first one that looks like a valid file (contains an extension or dot).
-    raw_filename = None
-    for part in parts:
-        clean_part = part.strip().lstrip('*') # Strip the unsaved changes asterisk
-        if "." in clean_part or clean_part.startswith("."):
-            # Extract just the filename in case the IDE title contains the full absolute path
-            raw_filename = os.path.basename(clean_part.replace("\\", "/"))
-            break
+    # --- STAGE 1: Fast Physical Disk Extraction for Code Editors ---
+    if found_editor_title:
+        parts = found_editor_title.split(" - ")
+        raw_filename = None
+        for part in parts:
+            clean_part = part.strip().lstrip('*')
+            if "." in clean_part or clean_part.startswith("."):
+                raw_filename = os.path.basename(clean_part.replace("\\", "/"))
+                break
+                
+        if raw_filename:
+            target_path = None
+            search_root = os.getcwd()
             
-    if not raw_filename:
-        return f"Target IDE window '{found_title}' does not appear to have an active file open (could not extract a valid filename)."
-        
-    # Crawl the local filesystem to find the physical file
-    target_path = None
-    search_root = os.getcwd()
-    
-    for root, _, files in os.walk(search_root):
-        # Skip heavy directories like .git or __pycache__ for speed
-        if ".git" in root or "__pycache__" in root:
-            continue
-        if raw_filename in files:
-            target_path = os.path.join(root, raw_filename)
-            break
-            
-    if not target_path:
-        return f"Extracted '{raw_filename}' from IDE title, but the physical file is missing from {search_root}."
-        
-    # Read the raw file directly off the disk
+            for root, _, files in os.walk(search_root):
+                if ".git" in root or "__pycache__" in root:
+                    continue
+                if raw_filename in files:
+                    target_path = os.path.join(root, raw_filename)
+                    break
+                    
+            if target_path:
+                try:
+                    with open(target_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                        if len(content) > 3000:
+                            content = content[:3000] + "\n... [FILE TRUNCATED]"
+                        return f"Deduced physical path from IDE Z-order: {target_path}\n\n[FILE CONTENTS]\n{content}"
+                except Exception as e:
+                    pass # Fallback to UIA if read fails
+                    
+    # --- STAGE 2: UI Automation API Fallback ---
+    # If not an editor, or physical read failed, fallback to native accessibility tree
     try:
-        with open(target_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            # Truncate to prevent token overflow on massive files
-            if len(content) > 2000:
-                content = content[:2000] + "\n... [FILE TRUNCATED]"
-            return f"Deduced physical path from Z-order: {target_path}\n\n[FILE CONTENTS]\n{content}"
+        import uiautomation as auto
+    except ImportError:
+        return f"Identified target window '{fallback_title or found_editor_title}', but 'uiautomation' is not installed to read generic GUIs."
+        
+    print(f"   [⚡ Kiko is hooking into native UIAutomation for window: {fallback_title or found_editor_title}...]")
+    
+    # We must configure auto to not block too long
+    auto.SetGlobalSearchTimeout(3)
+    
+    window_control = auto.WindowControl(searchDepth=1, Handle=target_hwnd)
+    if not window_control.Exists(0, 0):
+        return f"Could not bind UIA to target window '{fallback_title or found_editor_title}'."
+        
+    texts = []
+    # Walk the tree with max depth to prevent freezing on DOM-heavy apps like Discord/Chrome
+    try:
+        for control, depth in auto.WalkControl(window_control, maxDepth=10):
+            if control.ControlType in (auto.ControlType.TextControl, auto.ControlType.DocumentControl, auto.ControlType.EditControl):
+                try:
+                    name = control.Name
+                    # Sometimes Edit controls use 'Value' pattern instead of 'Name'
+                    if not name and control.ControlType == auto.ControlType.EditControl:
+                        try:
+                            name = control.GetValuePattern().Value
+                        except:
+                            pass
+                    
+                    if name and name.strip():
+                        texts.append(name.strip())
+                except:
+                    pass
     except Exception as e:
-        return f"Located {target_path} but kernel denied read access: {e}"
+        print(f"   [⚠️ UIA WalkControl interrupted: {e}]")
+                
+    raw_text = "\n".join(texts)
+    
+    if not raw_text.strip():
+        return f"Target window '{fallback_title or found_editor_title}' did not expose any readable UIA Text elements. It may be rendering a custom canvas instead of native controls."
+        
+    if len(raw_text) > 4000:
+        raw_text = raw_text[:4000] + "\n... [TRUNCATED FOR MEMORY]"
+        
+    return f"Extracted via native UI Automation from '{fallback_title or found_editor_title}':\n\n{raw_text}"
