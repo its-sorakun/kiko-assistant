@@ -123,3 +123,26 @@ Rather than aggressively launching visual GUI windows (via `os.startfile`) every
 - Queries `os.listdir()` to enumerate physical file entries.
 - Returns a raw text payload directly into the LLM's context window.
 - **Contextual Optimization Loop**: If the LLM observes that a requested target file rests in the currently inspected directory, it bypasses the heavy global MFT scan. It constructs the absolute path natively in-memory and launches the target file instantaneously with zero intermediate graphical disruption.
+
+## 12. Universal GUI Screen Reading (UIAutomation)
+**File:** `tools/windowing.py` -> `read_active_window_content()`
+
+When Kiko is asked to read the contents of an active web browser or non-IDE GUI application, filesystem hooks are insufficient because the data exists only in rendered DOM/UI state. 
+- **Accessibility Tree Hooking:** Rather than deploying fragile OCR or injecting bloated browser extensions, Kiko falls back to the native Microsoft UI Automation (UIA) API via the `uiautomation` wrapper.
+- **Deep DOM Crawling:** The tool hooks into the active foreground window and recursively walks its UIA element tree, specifically targeting `TextControl`, `EditControl`, and `DocumentControl` elements.
+- **Safety Limits:** To prevent Kiko from hanging infinitely on infinitely deep web DOMs, the crawler enforces a strict `maxDepth=10` limit. The extracted text is then aggregated and fed directly into the LLM's context.
+
+## 13. Win32 Clipboard Injection
+**File:** `tools/clipboard.py`
+
+Native clipboard access is provided by dropping down to `ctypes`.
+- **Global Memory Locking:** The tool hooks into `user32.dll` and `kernel32.dll`. It leverages `OpenClipboard`, `EmptyClipboard`, `GlobalAlloc`, `GlobalLock`, and `SetClipboardData` to pipe the pure UTF-16 text payload directly into the host OS clipboard. 
+- **Binary Bypass:** This architecture copies payloads natively without requiring Kiko to regurgitate the text in her chat window or rely on external clipboard binaries (like `clip.exe` or `pbcopy`).
+
+## 14. Isolated Job Application Orchestration
+**File:** `tools/job_application_helper.py`
+
+To orchestrate complex workflows like job applications without polluting professional emails with Kiko's underlying persona instructions, a dedicated helper tool isolates the generation phase.
+- **Autonomous Multi-Step Reasoning:** Kiko autonomously handles the initial logic pipeline using her primary toolset: processing target HR emails (whether provided directly by the user or extracted autonomously from a PDF via `advanced_pdf_query`), deducing company names, actively crawling the internet for company context (`perform_web_search`), and selecting the most relevant resume from the filesystem.
+- **Isolated Generation:** Once the context is gathered, Kiko triggers the `draft_and_copy_job_email` tool. This spins up an isolated `genai.Client` call independent of Kiko's main conversation loop. This guarantees the drafted email strictly adheres to a hardcoded professional meta-prompt, entirely insulated from Kiko's global system instructions (preventing anime quirks in professional emails).
+- **Auto-Injection:** To prevent Kiko's conversational wrapper ("Done, senpai!") from accidentally polluting the clipboard, the tool natively calls the internal `copy_to_clipboard` function *before* returning execution to Kiko, ensuring only the pure, drafted email is ready to be pasted.
