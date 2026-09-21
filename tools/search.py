@@ -67,8 +67,12 @@ class DuckDuckGoParser(HTMLParser):
             self.results.append(self.current_snippet.strip())
             self.current_snippet = ""
 
-def perform_web_search(query: str) -> str:
-    """Searches the internet for real-world facts to prevent hallucination. Use when user asks question which you are not sure if your response will include the latest data or not. Always use this when asking about any form of enterntainment(like anime, movies, games, etc) or when user asks to do an online search"""
+def perform_web_search(query: str, max_snippets: int = 5, urls_to_scrape: int = 1) -> str:
+    """
+    Searches the internet for real-world facts to prevent hallucination. 
+    Use when user asks question which you are not sure if your response will include the latest data or not. Always use this when asking about any form of enterntainment or online searches.
+    You can dynamically manage the depth of your research by passing 'max_snippets' (how many search results to read) and 'urls_to_scrape' (how many full webpages to deep-dive into).
+    """
     print(f"   [🌐 Kiko is performing a web search for: '{query}'...]")
     data = urllib.parse.urlencode({'q': query}).encode('utf-8')
     url = "https://lite.duckduckgo.com/lite/"
@@ -101,27 +105,33 @@ def perform_web_search(query: str) -> str:
     except Exception as e:
         return f"Failed to search DuckDuckGo: {e}"
 
-    # Fetch the deep-dive content from the FIRST search result
-    web_text = ""
-    first_url = parser.urls[0] if parser.urls else None
+    # Fetch the deep-dive content from the requested number of search results
+    web_texts = []
     
-    if first_url:
-        try:
-            print(f"   [🌐 Kiko is deep-diving into: {first_url}...]")
-            req_target = urllib.request.Request(first_url, headers=headers)
-            with urllib.request.urlopen(req_target, timeout=5) as response:
-                target_html = response.read().decode('utf-8', errors='ignore')
-                web_parser = WebContentParser()
-                web_parser.feed(target_html)
-                
-                # Combine the raw text and cap it to ~3000 characters to prevent memory overflow
-                web_text = " ".join(web_parser.text_content)
-                web_text = web_text[:3000]
-        except Exception as e:
-            web_text = f"Failed to load the target webpage: {e}"
-
-    snippets_text = "\n".join(parser.results[:5])
+    # Cap to prevent LLM context overflow or massive latency spikes
+    urls_to_scrape = max(0, min(urls_to_scrape, 3))
+    max_snippets = max(1, min(max_snippets, 15))
     
-    return f"DUCKDUCKGO SNIPPETS:\n{snippets_text}\n\nIN-DEPTH CONTENT ({first_url}):\n{web_text}"
+    if urls_to_scrape > 0 and parser.urls:
+        # Distribute a ~3000 character budget evenly across the URLs being scraped
+        char_budget = 3000 // urls_to_scrape
+        
+        for target_url in parser.urls[:urls_to_scrape]:
+            try:
+                print(f"   [🌐 Kiko is deep-diving into: {target_url}...]")
+                req_target = urllib.request.Request(target_url, headers=headers)
+                with urllib.request.urlopen(req_target, timeout=5) as response:
+                    target_html = response.read().decode('utf-8', errors='ignore')
+                    web_parser = WebContentParser()
+                    web_parser.feed(target_html)
+                    
+                    # Combine the raw text and cap it
+                    text = " ".join(web_parser.text_content)
+                    web_texts.append(f"--- SOURCE: {target_url} ---\n{text[:char_budget]}")
+            except Exception as e:
+                web_texts.append(f"--- SOURCE: {target_url} ---\nFailed to load the target webpage: {e}")
 
-# print(perform_web_search("latest Odette build guide"))
+    snippets_text = "\n".join(parser.results[:max_snippets])
+    deep_dive_text = "\n\n".join(web_texts)
+    
+    return f"DUCKDUCKGO SNIPPETS:\n{snippets_text}\n\nIN-DEPTH CONTENT:\n{deep_dive_text}"
