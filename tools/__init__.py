@@ -8,6 +8,8 @@ from .power import manage_power_state
 from .memory import memorize_preferences, get_all_preferences, recall_semantic_memory
 from .search import perform_web_search
 from .pdf_rag import advanced_pdf_query
+from .job_application_helper import draft_and_copy_job_email
+from .clipboard import copy_to_clipboard
 
 __all__ = [
     "launch_program", 
@@ -26,5 +28,7 @@ __all__ = [
     "perform_web_search",
     "list_directory_contents",
     "open_file",
-    "advanced_pdf_query"
+    "advanced_pdf_query",
+    "draft_and_copy_job_email",
+    "copy_to_clipboard"
 ]
