@@ -6,7 +6,9 @@ import psutil
 def open_directory(folder_path: str) -> str:
     """
     Open a specific folder using the native Windows Explorer.
+    You can use '~' to represent the user's home directory (e.g., '~/Documents').
     """
+    folder_path = os.path.expanduser(folder_path)
     # Quick sanity check to make sure the folder actually exists
     if os.path.exists(folder_path):
         os.startfile(folder_path)
@@ -14,11 +16,25 @@ def open_directory(folder_path: str) -> str:
     else:
         return f"Target directory does not exist: {folder_path}"
 
+def open_file(file_path: str) -> str:
+    """
+    Launch a specific file in its default associated application.
+    You can use '~' to represent the user's home directory (e.g., '~/Downloads/file.pdf').
+    """
+    file_path = os.path.expanduser(file_path)
+    if os.path.exists(file_path):
+        os.startfile(file_path)
+        return f"Opened file: {file_path}"
+    else:
+        return f"Target file does not exist: {file_path}"
+
 def list_directory_contents(folder_path: str) -> str:
     """
     List all files and subdirectories inside a given folder, returning the result as text.
     Use this to 'see' what is inside a folder without opening it visually.
+    You can use '~' to represent the user's home directory (e.g., '~/Desktop').
     """
+    folder_path = os.path.expanduser(folder_path)
     if not os.path.exists(folder_path):
         return f"Target directory does not exist: {folder_path}"
     

@@ -1,7 +1,7 @@
 # Aggregating the modular tools here so main.py doesn't have to change import paths. This keeps the flat API surface intact for the LLM tool schemas while separating the underlying mechanics.
 from .process import launch_program, force_kill_process
 from .telemetry import get_system_stats, get_hardware_details
-from .windowing import get_active_window, read_active_window_content, open_directory, list_directory_contents
+from .windowing import get_active_window, read_active_window_content, open_directory, list_directory_contents, open_file
 from .registry import query_registry_value
 from .media import control_system_media
 from .power import manage_power_state
@@ -23,5 +23,6 @@ __all__ = [
     "get_all_preferences",
     "recall_semantic_memory",
     "perform_web_search",
-    "list_directory_contents"
+    "list_directory_contents",
+    "open_file"
 ]
