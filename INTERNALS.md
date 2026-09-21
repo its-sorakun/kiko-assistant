@@ -100,14 +100,23 @@ To circumvent LLM hallucinations without relying on expensive, rate-limited thir
 - **Event-Driven DOM Stripping:** To prevent the massive HTML overhead of target webpages from crashing the LLM's context window, a second state machine (`WebContentParser`) is deployed. Taking advantage of `HTMLParser`'s event-driven callback architecture, it flips a boolean flag upon encountering `<script>`, `<style>`, or metadata opening tags. The `handle_data` event actively ignores incoming streams while this flag is active, mechanically throwing away all backend code and styling rules on the fly with zero memory overhead. The resulting pure text is capped at 3000 characters and injected directly into Kiko's context window alongside the DuckDuckGo snippets.
 
 ## 9. Global Master File Table (MFT) Scanner
-**File:** `mft_scanner/fast_search.cpp`, `tools/search.py` -> `perform_global_search()`
+**File:** `mft_scanner/fast_search.cpp`, `mft_scanner/__init__.py` -> `perform_global_search()`
 
 To provide instantaneous, system-wide file search without relying on the slow Windows Indexing Service, Kiko hooks directly into the NTFS Master File Table.
 - **Kernel-Level MFT Access**: A custom C++ executable leverages `DeviceIoControl` with `FSCTL_ENUM_USN_DATA` to read raw MFT entries directly from disk sectors, entirely bypassing high-level user-space directory traversal.
+- **Dynamic Drive Enumeration**: The Python wrapper utilizes `psutil.disk_partitions()` to dynamically discover all physically mounted NTFS volumes (e.g., `C:`, `D:`, `E:`). The C++ executable is sequentially fired across all attached drives natively, completely eliminating the need to hardcode search partitions.
 - **Path Resolution**: Because `FSCTL_ENUM_USN_DATA` returns raw 64-bit File Reference Numbers (FRNs) without directory hierarchy, the scanner dynamically translates FRNs into absolute paths by combining `OpenFileById` (with `FILE_FLAG_BACKUP_SEMANTICS`) and `GetFinalPathNameByHandleW`. 
 - **Tokenized Fuzzy Substring Search**: Rather than enforcing exact string matches, the search query is fractured into lowercase tokens. The scanner sequentially streams through the raw byte buffer of the MFT in memory, performing a multi-keyword fuzzy substring match against every file record. This allows Kiko to resolve complex user requests (e.g., "devops resume") into exact physical files (e.g., `RajatRaj_Resume_DevOps.pdf`) instantaneously.
 
-## 10. Silent Filesystem Inspection
+## 10. Agentic PDF Analysis (LangGraph Sub-Agent)
+**File:** `tools/pdf_rag.py` -> `advanced_pdf_query()`
+
+To prevent large PDF documents from saturating the LLM context window or crashing token limits, Kiko delegates PDF reading to an autonomous LangGraph sub-agent flow.
+- **Ephemeral FAISS Memory**: Kiko specifically avoids persistent, bloated databases like ChromaDB for document reads. PDFs are loaded via `PyPDFLoader`, chunked using `RecursiveCharacterTextSplitter`, and piped into a transient FAISS in-memory index that is deliberately cleared upon application exit.
+- **CPU-Optimized Embeddings**: Rather than making expensive API round-trips to Gemini to embed massive PDFs, the tool leverages `HuggingFaceEmbeddings` (`all-MiniLM-L6-v2`) via `sentence-transformers`. This generates ultra-fast, 384-dimensional dense vectors natively on the host's CPU.
+- **LangGraph Routing**: The sub-agent compiles a lightweight `StateGraph` which retrieves the top `k` semantically relevant chunks. These high-fidelity text segments are formatted and passed natively back into Kiko's main reasoning loop, enabling precise question-answering without exposing the parent model to the raw file bytes.
+
+## 11. Silent Filesystem Inspection
 **File:** `tools/windowing.py` -> `list_directory_contents()`
 
 Rather than aggressively launching visual GUI windows (via `os.startfile`) every time Kiko needs to examine a directory, a discrete parsing tool allows her to ingest folder contents silently.
