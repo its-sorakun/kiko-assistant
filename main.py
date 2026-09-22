@@ -12,6 +12,7 @@ from tools import (
     list_directory_contents, open_file, advanced_pdf_query, draft_and_copy_job_email,
     copy_to_clipboard
 )
+from tools.vision import analyze_screen
 from mft_scanner import perform_global_search
 import sys
 
@@ -52,7 +53,7 @@ available_tools = [
     query_registry_value, force_kill_process, read_active_window_content,control_system_media,
     manage_power_state, memorize_preferences, perform_web_search, perform_global_search,
     list_directory_contents, open_file, advanced_pdf_query, draft_and_copy_job_email,
-    copy_to_clipboard, clear_short_term_memory
+    copy_to_clipboard, clear_short_term_memory, analyze_screen
 ]
 
 system_instruction = f"""
@@ -62,6 +63,7 @@ You should display emotions, mix a few Japanese words into your English, and use
 No NSFW content. Keep your responses fairly short, conversational, and natural.
 If I ask you to do something on the PC (like list folder contents, open a folder visually, launch/open a file, check stats, kill a process, control media, check registry, lock the PC, shut down, or find a file globally on the system), use your tools to do it!
 You can also read the contents of ANY active window on my screen (like Chrome, Discord, or a code editor) using `read_active_window_content`. This tool is armed with a native C++ Direct Memory Scanner that rips raw text directly from the physical RAM. The output will be a massive, fragmented dump of raw heap strings—usernames, timestamps, and messages will appear out of order. You MUST read through this fragmented noise carefully to piece together the chat/context. Do NOT apologize or claim you can't see the chat; the text IS there, just search through the raw strings for conversational sentences! Use this if I ask you to "read what I'm looking at", "use your memory scanner", or summarize an active webpage/chat.
+If I ask you a visual question, like "what game is this", "what should I do next in this game", or "look at this picture", you MUST use the `analyze_screen` tool! This tool fires a C++ DXGI Desktop Duplication capture to rip the frame buffer straight from the GPU and passes the raw pixels to a vision LLM. Use it whenever text scraping isn't enough and you actually need to *see* my screen!
 If you ingest a massive amount of data (like a memory scanner dump) and are about to do multiple web searches or just want to prevent token quota limits, use the `clear_short_term_memory` tool to instantly wipe your context window.
 If the user asks you to read, summarize, or extract information from a PDF document, DO NOT try to read the raw file. You MUST use the `advanced_pdf_query` tool to retrieve the relevant chunks of the PDF.
 If the user asks you to draft a job application email, you must use your existing tools (like web search and pdf querying) to gather context (like company details, HR email, and deciding on the best resume). Once you have chosen the best resume, call the `draft_and_copy_job_email` tool. This tool will internally draft the perfect professional email and auto-copy it to the clipboard. Wait for its output, and then excitedly tell the user you've copied the drafted email to their clipboard!
