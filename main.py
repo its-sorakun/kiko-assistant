@@ -195,7 +195,7 @@ def main():
 
     # Initialize the session context
     try:
-        response = send_with_fallback(f"Wake up, Kiko and look at the clock for time awareness: {time_context}")
+        response = send_with_fallback(f"Kiko boots up and looks at time: {time_context} before greeting")
         print(f"\nKiko: {response.text}")
     except Exception as e:
         print(f"\n[Kiko encountered an error during boot]: {e}")
