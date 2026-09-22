@@ -55,10 +55,8 @@ def analyze_screen(prompt: str) -> str:
         
         for m in fallback_chain:
             try:
-                response = client.models.generate_content(
-                    model=m,
-                    contents=[prompt, img]
-                )
+                chat = client.chats.create(model=m)
+                response = chat.send_message([prompt, img])
                 break # Success
             except Exception as e:
                 err_str = str(e).lower()
