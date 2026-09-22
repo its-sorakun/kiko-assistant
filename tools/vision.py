@@ -11,26 +11,45 @@ client = genai.Client(api_key=api_key)
 
 def analyze_screen(prompt: str) -> str:
     """
-    Captures the current frame buffer of the screen (using DXGI Desktop Duplication)
-    and passes it to a vision LLM alongside your prompt.
+    Captures the current frame buffer of the screen and passes it to a vision LLM alongside your prompt.
+    It natively uses DXGI Desktop Duplication, but features a dynamic heuristic to fallback to GDI BitBlt
+    if it detects an MPO or Anti-Cheat black screen.
     Use this to "look" at the user's screen when they ask for help in a game or want you to see something visually.
     """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     capture_tool = os.path.join(base_dir, "tools", "dxgi_capture", "dxgi_capture.exe")
     output_bmp = os.path.join(base_dir, "scratch", "screenshot.bmp")
 
-    print(f"\n   [👀 Kiko is looking at the screen natively via DXGI...]")
+    print(f"\n   [👀 Kiko is trying to look at the screen natively via DXGI...]")
     
+    img = None
+    use_gdi_fallback = False
+
     try:
-        # Run the C++ capture tool
+        # 1. Attempt DXGI Capture
         subprocess.run([capture_tool, output_bmp], capture_output=True, text=True, check=True)
-        
-        if not os.path.exists(output_bmp):
-            return "Error: Could not capture the screen. The C++ tool failed to generate the BMP."
+        if os.path.exists(output_bmp):
+            img = Image.open(output_bmp)
             
-        # Load the image
-        img = Image.open(output_bmp)
+            # Heuristic: Check if the DXGI capture is a solid black screen (MPO / Anti-Cheat blocking)
+            from PIL import ImageStat
+            stat = ImageStat.Stat(img)
+            # If the average pixel value across RGB is extremely close to 0, it's essentially pitch black
+            if sum(stat.mean[:3]) < 1.0:
+                print(f"   [⚠️ DXGI returned a black screen (MPO/Anti-Cheat). Falling back to GDI BitBlt...]")
+                use_gdi_fallback = True
+        else:
+            use_gdi_fallback = True
+
+    except subprocess.CalledProcessError:
+        print(f"   [⚠️ DXGI capture failed. Falling back to GDI BitBlt...]")
+        use_gdi_fallback = True
+
+    if use_gdi_fallback or img is None:
+        from PIL import ImageGrab
+        img = ImageGrab.grab(all_screens=True)
         
+    try:
         # Send to the lightweight vision model
         # The user requested gemini-3.5-flash-lite
         response = client.models.generate_content(
@@ -40,7 +59,5 @@ def analyze_screen(prompt: str) -> str:
         
         return f"Vision Analysis Result:\n{response.text}"
         
-    except subprocess.CalledProcessError as e:
-        return f"Error executing DXGI capture: {e.stderr}"
     except Exception as e:
         return f"Error analyzing screen: {str(e)}"
