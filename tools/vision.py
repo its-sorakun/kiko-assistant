@@ -23,7 +23,7 @@ def analyze_screen(prompt: str) -> str:
     
     try:
         # Run the C++ capture tool
-        result = subprocess.run([capture_tool, output_bmp], capture_output=True, text=True, check=True)
+        subprocess.run([capture_tool, output_bmp], capture_output=True, text=True, check=True)
         
         if not os.path.exists(output_bmp):
             return "Error: Could not capture the screen. The C++ tool failed to generate the BMP."
