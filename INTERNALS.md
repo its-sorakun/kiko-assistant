@@ -124,13 +124,12 @@ Rather than aggressively launching visual GUI windows (via `os.startfile`) every
 - Returns a raw text payload directly into the LLM's context window.
 - **Contextual Optimization Loop**: If the LLM observes that a requested target file rests in the currently inspected directory, it bypasses the heavy global MFT scan. It constructs the absolute path natively in-memory and launches the target file instantaneously with zero intermediate graphical disruption.
 
-## 12. Universal GUI Screen Reading (UIAutomation)
+## 12. Universal Screen Reading (Direct Memory Hooking & UIA)
 **File:** `tools/windowing.py` -> `read_active_window_content()`
 
-When Kiko is asked to read the contents of an active web browser or non-IDE GUI application, filesystem hooks are insufficient because the data exists only in rendered DOM/UI state. 
-- **Accessibility Tree Hooking:** Rather than deploying fragile OCR or injecting bloated browser extensions, Kiko falls back to the native Microsoft UI Automation (UIA) API via the `uiautomation` wrapper.
-- **Deep DOM Crawling:** The tool hooks into the active foreground window and recursively walks its UIA element tree, specifically targeting `TextControl`, `EditControl`, and `DocumentControl` elements.
-- **Safety Limits:** To prevent Kiko from hanging infinitely on infinitely deep web DOMs, the crawler enforces a strict `maxDepth=10` limit. The extracted text is then aggregated and fed directly into the LLM's context.
+When Kiko is asked to read the contents of an active application, filesystem hooks are insufficient because the data exists only in rendered DOM/UI state. 
+- **Direct Memory Scanner (Primary):** Instead of relying on fragile OCR or brittle DOM injection, Kiko defaults to a custom C++ native executable (`memory_scanner.exe`) for modern, sandboxed web-apps (e.g., Discord, WhatsApp Web, Electron wrappers). This tool bypasses the UI layer entirely, dropping down to `ReadProcessMemory` to rip raw text strings directly out of the target application's active `PAGE_READWRITE` heap chunks. It cross-sections the memory into samples and employs code-signature heuristics to filter out V8 JavaScript engine noise, extracting pure chat context.
+- **Accessibility Tree Hooking (Secondary):** For legacy GUI applications where memory scanning isn't necessary, Kiko gracefully falls back to the native Microsoft UI Automation (UIA) API via the `uiautomation` wrapper. The tool recursively walks the UIA element tree, specifically targeting `TextControl` and `DocumentControl` elements, enforcing a strict `maxDepth=10` limit to prevent infinite hangs on deep DOMs.
 
 ## 13. Win32 Clipboard Injection
 **File:** `tools/clipboard.py`
@@ -146,3 +145,10 @@ To orchestrate complex workflows like job applications without polluting profess
 - **Autonomous Multi-Step Reasoning:** Kiko autonomously handles the initial logic pipeline using her primary toolset: processing target HR emails (whether provided directly by the user or extracted autonomously from a PDF via `advanced_pdf_query`), deducing company names, actively crawling the internet for company context (`perform_web_search`), and selecting the most relevant resume from the filesystem.
 - **Isolated Generation:** Once the context is gathered, Kiko triggers the `draft_and_copy_job_email` tool. This spins up an isolated `genai.Client` call independent of Kiko's main conversation loop. This guarantees the drafted email strictly adheres to a hardcoded professional meta-prompt, entirely insulated from Kiko's global system instructions (preventing anime quirks in professional emails).
 - **Auto-Injection:** To prevent Kiko's conversational wrapper ("Done, senpai!") from accidentally polluting the clipboard, the tool natively calls the internal `copy_to_clipboard` function *before* returning execution to Kiko, ensuring only the pure, drafted email is ready to be pasted.
+
+## 15. Context Token Management
+**File:** `main.py` -> `clear_short_term_memory()`
+
+To prevent massive localized data ingestion (such as pulling an 85MB raw heap dump via the C++ memory scanner or chaining multiple DuckDuckGo HTML web parses) from exploding the LLM context window and triggering `429 RESOURCE_EXHAUSTED` rate limits:
+- **Autonomous Context Wiping:** Kiko is equipped with a `clear_short_term_memory` tool. When she detects that her context backpack is bloated and she is about to perform another heavy operation (like a web search), she autonomously calls this tool.
+- **Global Session Recreation:** Rather than attempting complex manual list truncation, the tool flips a global flag. When Kiko finishes her response, the main loop catches the flag, drops the entire Google GenAI `chat` session object to the garbage collector, and instantly spins up a fresh session with a blank context window, resetting API token consumption to zero on the fly.
