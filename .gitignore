@@ -17,7 +17,7 @@ test_vscode.py
 tools_backup.py
 test_smtc.ps1
 db/kiko_cortex.db
-
+kiko.bat
 # Visual Studio Build Artifacts (C++ cpu_monitor)
 .vs/
 x64/
