@@ -131,14 +131,22 @@ When Kiko is asked to read the contents of an active application, filesystem hoo
 - **Direct Memory Scanner (Primary):** Instead of relying on fragile OCR or brittle DOM injection, Kiko defaults to a custom C++ native executable (`memory_scanner.exe`) for modern, sandboxed web-apps (e.g., Discord, WhatsApp Web, Electron wrappers). This tool bypasses the UI layer entirely, dropping down to `ReadProcessMemory` to rip raw text strings directly out of the target application's active `PAGE_READWRITE` heap chunks. It cross-sections the memory into samples and employs code-signature heuristics to filter out V8 JavaScript engine noise, extracting pure chat context.
 - **Accessibility Tree Hooking (Secondary):** For legacy GUI applications where memory scanning isn't necessary, Kiko gracefully falls back to the native Microsoft UI Automation (UIA) API via the `uiautomation` wrapper. The tool recursively walks the UIA element tree, specifically targeting `TextControl` and `DocumentControl` elements, enforcing a strict `maxDepth=10` limit to prevent infinite hangs on deep DOMs.
 
-## 13. Win32 Clipboard Injection
+## 13. Native Multimodal Frame Buffer Vision
+**File:** `tools/vision.py` -> `analyze_screen()`
+
+When text extraction isn't enough (like analyzing a video game state or reading an image), Kiko invokes a custom C++ tool (`dxgi_capture.exe`) that hooks the OS Desktop Window Manager (DWM) via the DXGI Desktop Duplication API.
+- **Direct GPU Ripping:** This rips the raw frame buffer directly from the GPU VRAM in roughly 1ms, dumping it to a lightweight `.bmp`.
+- **Dynamic MPO/GDI Fallback:** If the game utilizes Multi-Plane Overlays (MPO) or Kernel Anti-Cheat (e.g., Genshin Impact) that causes DXGI to capture a black screen hole, the vision tool autonomously detects the zero-variance frame (`ImageStat.mean < 1.0`). It instantly drops down to a legacy Win32 GDI `BitBlt` capture (`ImageGrab.grab(all_screens=True)`). This leverages the `CAPTUREBLT` flag to violently force the Windows DWM to composite all hardware planes, bypassing the anti-cheat blackout.
+- **Multimodal Integration:** The final raw image bytes are piped directly into Gemini's multimodal vision encoder (`gemini-3.5-flash-lite`) natively, allowing Kiko to "see" the HUD, read quests, and parse visual context without fragile OCR scraping.
+
+## 14. Win32 Clipboard Injection
 **File:** `tools/clipboard.py`
 
 Native clipboard access is provided by dropping down to `ctypes`.
 - **Global Memory Locking:** The tool hooks into `user32.dll` and `kernel32.dll`. It leverages `OpenClipboard`, `EmptyClipboard`, `GlobalAlloc`, `GlobalLock`, and `SetClipboardData` to pipe the pure UTF-16 text payload directly into the host OS clipboard. 
 - **Binary Bypass:** This architecture copies payloads natively without requiring Kiko to regurgitate the text in her chat window or rely on external clipboard binaries (like `clip.exe` or `pbcopy`).
 
-## 14. Isolated Job Application Orchestration
+## 15. Isolated Job Application Orchestration
 **File:** `tools/job_application_helper.py`
 
 To orchestrate complex workflows like job applications without polluting professional emails with Kiko's underlying persona instructions, a dedicated helper tool isolates the generation phase.
@@ -146,7 +154,7 @@ To orchestrate complex workflows like job applications without polluting profess
 - **Isolated Generation:** Once the context is gathered, Kiko triggers the `draft_and_copy_job_email` tool. This spins up an isolated `genai.Client` call independent of Kiko's main conversation loop. This guarantees the drafted email strictly adheres to a hardcoded professional meta-prompt, entirely insulated from Kiko's global system instructions (preventing anime quirks in professional emails).
 - **Auto-Injection:** To prevent Kiko's conversational wrapper ("Done, senpai!") from accidentally polluting the clipboard, the tool natively calls the internal `copy_to_clipboard` function *before* returning execution to Kiko, ensuring only the pure, drafted email is ready to be pasted.
 
-## 15. Context Token Management
+## 16. Context Token Management
 **File:** `main.py` -> `clear_short_term_memory()`
 
 To prevent massive localized data ingestion (such as pulling an 85MB raw heap dump via the C++ memory scanner or chaining multiple DuckDuckGo HTML web parses) from exploding the LLM context window and triggering `429 RESOURCE_EXHAUSTED` rate limits:
