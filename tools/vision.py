@@ -50,13 +50,27 @@ def analyze_screen(prompt: str) -> str:
         img = ImageGrab.grab(all_screens=True)
         
     try:
-        # Send to the lightweight vision model
-        # The user requested gemini-3.5-flash-lite
-        response = client.models.generate_content(
-            model='gemini-3.5-flash-lite',
-            contents=[prompt, img]
-        )
+        fallback_chain = ['gemini-3.5-flash-lite','gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-pro', 'gemini-3.1-flash-lite']
+        response = None
         
+        for m in fallback_chain:
+            try:
+                response = client.models.generate_content(
+                    model=m,
+                    contents=[prompt, img]
+                )
+                break # Success
+            except Exception as e:
+                err_str = str(e).lower()
+                if "503" in err_str or "demand" in err_str or "not found" in err_str:
+                    print(f"   [⚠️ {m} failed (High Demand/Unavailable). Falling back...]")
+                    continue
+                else:
+                    return f"Error analyzing screen: {str(e)}"
+                    
+        if not response:
+            return "Error: All models in the fallback chain are experiencing high demand or are unavailable."
+            
         return f"Vision Analysis Result:\n{response.text}"
         
     except Exception as e:

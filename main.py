@@ -32,8 +32,11 @@ if not api_key or api_key == "your_new_api_key_goes_here":
 # Initialize the generative AI client
 client = genai.Client(api_key=api_key)
 
-# Model configuration
-model_name = "gemini-3.5-flash-lite"
+# Model configuration and fallback chain
+# primary model is gemini-3.5-flash-lite due to having the highest token limit
+model_fallback_chain = ['gemini-3.5-flash-lite','gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-pro', 'gemini-3.1-flash-lite']
+current_model_index = 0
+model_name = model_fallback_chain[current_model_index]
 
 needs_memory_clear = False
 
@@ -164,9 +167,38 @@ def main():
     # print(current_time)
     time_context = f"[Current System Time: {current_time}]\n"
     
+    def send_with_fallback(prompt_text):
+        global chat, model_name, current_model_index
+        success = False
+        resp = None
+        for i in range(current_model_index, len(model_fallback_chain)):
+            try:
+                if i != current_model_index:
+                    print(f"   [⚠️ {model_name} failed (High Demand). Falling back to {model_fallback_chain[i]}...]")
+                    current_model_index = i
+                    model_name = model_fallback_chain[current_model_index]
+                    chat = client.chats.create(model=model_name, config=config)
+                
+                resp = chat.send_message(prompt_text)
+                success = True
+                break
+            except Exception as e:
+                err_str = str(e).lower()
+                if "503" in err_str or "demand" in err_str or "not found" in err_str:
+                    continue
+                else:
+                    raise e
+                    
+        if not success:
+            raise Exception("All models in the fallback chain are experiencing high demand.")
+        return resp
+
     # Initialize the session context
-    response = chat.send_message(f"Wake up, Kiko and look at the clock for time awareness: {time_context}")
-    print(f"\nKiko: {response.text}")
+    try:
+        response = send_with_fallback(f"Wake up, Kiko and look at the clock for time awareness: {time_context}")
+        print(f"\nKiko: {response.text}")
+    except Exception as e:
+        print(f"\n[Kiko encountered an error during boot]: {e}")
     
     while True:
         try:
@@ -212,7 +244,11 @@ def main():
             print("   [⚡ Kiko is thinking / executing...]")
             
             # The SDK handles function calling autonomously
-            response = chat.send_message(augmented_prompt)
+            try:
+                response = send_with_fallback(augmented_prompt)
+            except Exception as e:
+                print(f"\n[Kiko encountered an error]: {e}")
+                continue
             
             if response.text:
                 print(f"\nKiko: {response.text}")
