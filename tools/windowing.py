@@ -101,8 +101,9 @@ def read_active_window_content() -> str:
     """
     Attempt to read the contents of the currently active window.
     For code editors, it deduces the filename and reads directly from disk for instant speed.
-    For all other GUI applications (browsers, discord, etc.), it hooks into the native Microsoft
-    UI Automation API to scrape the visible accessibility text tree.
+    For all other GUI applications (browsers, discord, games, etc.), it uses a custom C++ Direct Memory Scanner 
+    to rip raw text strings straight out of the physical RAM (bypassing all UI protections), combined 
+    with a structural UI Automation layout.
     """
     user32 = ctypes.windll.user32
     hwnd = user32.GetForegroundWindow()
@@ -112,6 +113,7 @@ def read_active_window_content() -> str:
     found_editor_title = None
     target_hwnd = None
     fallback_title = None
+    target_exe_name = None
     
     current_pid = os.getpid()
     
@@ -147,6 +149,7 @@ def read_active_window_content() -> str:
                         if not target_hwnd:
                             target_hwnd = hwnd
                             fallback_title = window_title
+                            target_exe_name = proc_name
                         
                         # Check if this window belongs to a known editor
                         if any(sig in window_title for sig in editor_signatures):
@@ -207,30 +210,85 @@ def read_active_window_content() -> str:
         return f"Could not bind UIA to target window '{fallback_title or found_editor_title}'."
         
     texts = []
-    # Walk the tree with max depth to prevent freezing on DOM-heavy apps like Discord/Chrome
     try:
-        for control, depth in auto.WalkControl(window_control, maxDepth=10):
-            if control.ControlType in (auto.ControlType.TextControl, auto.ControlType.DocumentControl, auto.ControlType.EditControl):
-                try:
-                    name = control.Name
-                    # Sometimes Edit controls use 'Value' pattern instead of 'Name'
-                    if not name and control.ControlType == auto.ControlType.EditControl:
-                        try:
-                            name = control.GetValuePattern().Value
-                        except:
-                            pass
-                    
-                    if name and name.strip():
-                        texts.append(name.strip())
-                except:
-                    pass
+        # Increased maxDepth to 15 because Electron/CEF apps (Discord, Steam) have extremely deep DOM trees
+        for control, depth in auto.WalkControl(window_control, maxDepth=15):
+            try:
+                name = control.Name
+                # Fallback to ValuePattern for input fields
+                if not name:
+                    try:
+                        name = control.GetValuePattern().Value
+                    except:
+                        pass
+                
+                if name and name.strip():
+                    clean_name = name.strip()
+                    # Prevent duplicating the exact same text if nested controls share the same name
+                    if not texts or texts[-1] != clean_name:
+                        texts.append(clean_name)
+            except:
+                pass
     except Exception as e:
         print(f"   [⚠️ UIA WalkControl interrupted: {e}]")
                 
     raw_text = "\n".join(texts)
     
+    # Always run the C++ memory scanner as the primary extraction method for all applications
+    mem_output = ""
+    if target_exe_name:
+        print(f"   [⚡ Triggering Direct Memory Scanner on '{target_exe_name}'...]")
+        
+        import subprocess
+        scanner_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "memory_scanner")
+        cpp_file = os.path.join(scanner_dir, "memory_scanner.cpp")
+        exe_file = os.path.join(scanner_dir, "memory_scanner.exe")
+        
+        if not os.path.exists(exe_file) and os.path.exists(cpp_file):
+            print(f"   [⚙️ Compiling memory_scanner.cpp natively using g++...]")
+            try:
+                # Using g++ so it works in a standard terminal without MSVC Developer Command Prompt
+                subprocess.run(f'g++ -O3 -municode -o "{exe_file}" "{cpp_file}"', shell=True, check=True, cwd=scanner_dir, capture_output=True)
+            except subprocess.CalledProcessError as e:
+                print(f"   [❌ Compilation failed: {e.stderr.decode(errors='ignore')}]")
+                return f"Target window '{fallback_title or found_editor_title}' hides its text, and memory scanner failed to compile. Need g++ in PATH."
+
+        if os.path.exists(exe_file):
+            try:
+                result = subprocess.run([exe_file, target_exe_name], capture_output=True, text=True, check=True)
+                mem_output = result.stdout.strip()
+                if mem_output:
+                    # Parse the PID blocks outputted by memory_scanner.cpp
+                    # Take the last 4000 characters of EACH process to guarantee we capture the renderer process heap
+                    import re
+                    blocks = re.split(r'--- START PID \d+ ---', mem_output)
+                    sampled_output = []
+                    for block in blocks:
+                        clean_block = re.sub(r'--- END PID \d+ ---', '', block).strip()
+                        if not clean_block: continue
+                        
+                        # The JS heap (where chats live) can be anywhere in the address space.
+                        # We take a 15,000-character cross-section (start, middle, end) of each process.
+                        if len(clean_block) > 15000:
+                            mid = len(clean_block) // 2
+                            start_chunk = clean_block[:5000]
+                            mid_chunk = clean_block[mid-2500 : mid+2500]
+                            end_chunk = clean_block[-5000:]
+                            
+                            sampled_output.append(f"{start_chunk}\n... [TRUNCATED MEMORY SPACE] ...\n{mid_chunk}\n... [TRUNCATED MEMORY SPACE] ...\n{end_chunk}")
+                        else:
+                            sampled_output.append(clean_block)
+                    
+                    mem_output = "\n\n--- NEXT PROCESS HEAP ---\n\n".join(sampled_output)
+            except Exception as e:
+                print(f"   [⚠️ Memory Scanner failed: {e}]")
+                
+    if mem_output:
+        combined_output = f"Extracted via native UI Automation (UI Layout):\n{raw_text[:1000]}\n\n--- DIRECT MEMORY SCANNER DUMP (RAW HEAP) ---\n{mem_output}"
+        return combined_output
+        
     if not raw_text.strip():
-        return f"Target window '{fallback_title or found_editor_title}' did not expose any readable UIA Text elements. It may be rendering a custom canvas instead of native controls."
+        return f"Target window '{fallback_title or found_editor_title}' did not expose any readable UIA Text elements, and memory scanner returned nothing."
         
     if len(raw_text) > 4000:
         raw_text = raw_text[:4000] + "\n... [TRUNCATED FOR MEMORY]"

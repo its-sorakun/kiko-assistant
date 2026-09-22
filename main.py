@@ -13,6 +13,11 @@ from tools import (
     copy_to_clipboard
 )
 from mft_scanner import perform_global_search
+import sys
+
+# Force UTF-8 encoding for standard output so Windows console doesn't crash on Kiko's emojis
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 
 # Load the API key from the environment
 load_dotenv()
@@ -29,13 +34,25 @@ client = genai.Client(api_key=api_key)
 # Model configuration
 model_name = "gemini-3.5-flash-lite"
 
+needs_memory_clear = False
+
+def clear_short_term_memory() -> str:
+    """
+    Clears Kiko's short-term memory (context window) to prevent token bloat and API quota errors.
+    Call this tool autonomously if you have recently ingested massive amounts of data (like a memory dump)
+    and want to free up tokens before continuing to chat or perform web searches or if user prompts you to clear the short term memory.
+    """
+    global needs_memory_clear
+    needs_memory_clear = True
+    return "Short-term memory cleared successfully. Your context is now fresh."
+
 # Expose native Win32/OS hooks to the agent
 available_tools = [
     launch_program, get_system_stats, open_directory,get_active_window ,get_hardware_details,
     query_registry_value, force_kill_process, read_active_window_content,control_system_media,
     manage_power_state, memorize_preferences, perform_web_search, perform_global_search,
     list_directory_contents, open_file, advanced_pdf_query, draft_and_copy_job_email,
-    copy_to_clipboard
+    copy_to_clipboard, clear_short_term_memory
 ]
 
 system_instruction = f"""
@@ -44,7 +61,8 @@ Your personality is cute, cheerful, and energetic. You are an anime girl.
 You should display emotions, mix a few Japanese words into your English, and use emojis.
 No NSFW content. Keep your responses fairly short, conversational, and natural.
 If I ask you to do something on the PC (like list folder contents, open a folder visually, launch/open a file, check stats, kill a process, control media, check registry, lock the PC, shut down, or find a file globally on the system), use your tools to do it!
-You can also read the contents of ANY active window on my screen (like Chrome, Discord, or a code editor) using `read_active_window_content`. Use this if I ask you to "read what I'm looking at" or summarize an active webpage.
+You can also read the contents of ANY active window on my screen (like Chrome, Discord, or a code editor) using `read_active_window_content`. This tool is armed with a native C++ Direct Memory Scanner that rips raw text directly from the physical RAM. The output will be a massive, fragmented dump of raw heap strings—usernames, timestamps, and messages will appear out of order. You MUST read through this fragmented noise carefully to piece together the chat/context. Do NOT apologize or claim you can't see the chat; the text IS there, just search through the raw strings for conversational sentences! Use this if I ask you to "read what I'm looking at", "use your memory scanner", or summarize an active webpage/chat.
+If you ingest a massive amount of data (like a memory scanner dump) and are about to do multiple web searches or just want to prevent token quota limits, use the `clear_short_term_memory` tool to instantly wipe your context window.
 If the user asks you to read, summarize, or extract information from a PDF document, DO NOT try to read the raw file. You MUST use the `advanced_pdf_query` tool to retrieve the relevant chunks of the PDF.
 If the user asks you to draft a job application email, you must use your existing tools (like web search and pdf querying) to gather context (like company details, HR email, and deciding on the best resume). Once you have chosen the best resume, call the `draft_and_copy_job_email` tool. This tool will internally draft the perfect professional email and auto-copy it to the clipboard. Wait for its output, and then excitedly tell the user you've copied the drafted email to their clipboard!
 If you draft code snippets or anything else, use the `copy_to_clipboard` tool to automatically copy it to the Windows clipboard for senpai, and let him know you copied it!
@@ -111,6 +129,7 @@ def thermal_monitor_thread():
         time.sleep(2)
 
 def main():
+    global chat
     # boot the c++ hardware monitoring daemon silently in the background before aiko wakes up
     import subprocess
     
@@ -144,7 +163,7 @@ def main():
     time_context = f"[Current System Time: {current_time}]\n"
     
     # Initialize the session context
-    response = chat.send_message(f"{time_context}Wake up Kiko! Keep your response very brief and greet senpai appropriately for the current time of day.")
+    response = chat.send_message(f"Wake up, Kiko and look at the clock for time awareness: {time_context}")
     print(f"\nKiko: {response.text}")
     
     while True:
@@ -155,6 +174,12 @@ def main():
             if user_input.lower() in ['exit', 'quit']:
                 print("Matane, senpai! See you later!")
                 break
+                
+            # Clear short-term memory (context window) to free up token usage
+            if user_input.lower() == 'clear':
+                print("[System] Short-term memory wiped! The 'heavy backpack' is gone.")
+                chat = client.chats.create(model=model_name, config=config)
+                continue
             
             if not user_input.strip():
                 continue
@@ -199,7 +224,12 @@ def main():
                 save_vector_memory(interaction_log, save_resp.embeddings[0].values)
                 # print(f"Interaction embedded and saved to SQLite: {interaction_log}")
 
-            
+            global needs_memory_clear
+            if needs_memory_clear:
+                print("   [🔧 System: Memory Cleared by Kiko's Request to save API Tokens]")
+                chat = client.chats.create(model=model_name, config=config)
+                needs_memory_clear = False
+
         except KeyboardInterrupt:
             # Handle Ctrl+C termination
             print("\nArigato senpai >_< Matane!")
