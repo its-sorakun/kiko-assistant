@@ -16,6 +16,8 @@ from .search import perform_web_search
 from .pdf_rag import advanced_pdf_query
 from .job_application_helper import draft_and_copy_job_email
 from .clipboard import copy_to_clipboard
+from .vision import analyze_screen
+from .mft_scanner import perform_global_search
 
 __all__ = [
     "launch_program", 
@@ -36,5 +38,7 @@ __all__ = [
     "open_file",
     "advanced_pdf_query",
     "draft_and_copy_job_email",
-    "copy_to_clipboard"
+    "copy_to_clipboard",
+    "analyze_screen",
+    "perform_global_search"
 ]

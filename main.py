@@ -16,10 +16,8 @@ from tools import (
     query_registry_value, force_kill_process, read_active_window_content, control_system_media,
     manage_power_state, memorize_preferences, get_all_preferences, perform_web_search,
     list_directory_contents, open_file, advanced_pdf_query, draft_and_copy_job_email,
-    copy_to_clipboard
+    copy_to_clipboard, analyze_screen, perform_global_search
 )
-from tools.vision import analyze_screen
-from tools.mft_scanner import perform_global_search
 import sys
 
 # Force UTF-8 encoding for standard output so Windows console doesn't crash on Kiko's emojis
