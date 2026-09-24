@@ -32,19 +32,37 @@ def analyze_screen(prompt: str) -> str:
     use_gdi_fallback = False
 
     try:
-        # 1. Attempt DXGI Capture
-        subprocess.run([capture_tool, output_bmp], capture_output=True, text=True, check=True)
-        if os.path.exists(output_bmp):
-            img = Image.open(output_bmp)
-            
-            # Heuristic: Check if the DXGI capture is a solid black screen (MPO / Anti-Cheat blocking)
-            from PIL import ImageStat
-            stat = ImageStat.Stat(img)
-            # If the average pixel value across RGB is extremely close to 0, it's essentially pitch black
-            if sum(stat.mean[:3]) < 1.0:
-                print(f"   [⚠️ DXGI returned a black screen (MPO/Anti-Cheat). Falling back to GDI BitBlt...]")
-                use_gdi_fallback = True
-        else:
+        import mmap
+        import struct
+
+        # Allocate 35MB to safely fit uncompressed 4K/Ultra-Wide raw frames.
+        MAX_SIZE = 35 * 1024 * 1024 
+        map_name = "Local\\KikoDXGIFrame"
+
+        # Passing -1 forces Windows to allocate the mapping in the system page file (RAM) instead of tracking a physical file.
+        shm = mmap.mmap(-1, MAX_SIZE, tagname=map_name, access=mmap.ACCESS_WRITE)
+
+        # Spawning the capture tool inherits this memory mapping. The OS keeps the block alive as long as this handle remains open.
+        subprocess.run([capture_tool, map_name], capture_output=True, text=True, check=True)
+        
+        shm.seek(0)
+        
+        # The C++ tool writes the display dimensions at the 0x0 offset before dumping the raw buffer.
+        width, height = struct.unpack('ii', shm.read(8))
+        
+        pixel_size = width * height * 4
+        raw_pixels = shm.read(pixel_size)
+        
+        # Reconstruct the physical pixel grid natively without incurring SSD I/O.
+        img = Image.frombytes("RGBA", (width, height), raw_pixels, "raw", "BGRA")
+        
+        # Heuristic: Check if the DXGI capture is a solid black screen (MPO / Anti-Cheat blocking)
+        from PIL import ImageStat
+        stat = ImageStat.Stat(img)
+        
+        # If the average pixel value across RGB is extremely close to 0, it's essentially pitch black
+        if sum(stat.mean[:3]) < 1.0:
+            print(f"   [⚠️ DXGI returned a black screen (MPO/Anti-Cheat). Falling back to GDI BitBlt...]")
             use_gdi_fallback = True
 
     except subprocess.CalledProcessError:

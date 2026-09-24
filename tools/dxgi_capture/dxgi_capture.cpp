@@ -16,34 +16,64 @@
 #pragma comment(lib, "dxgi.lib")
 
 // Helper to write a simple 32-bit BGRA BMP
-bool WriteBMP(const char* filename, int width, int height, const std::vector<uint8_t>& data) {
-    std::ofstream file(filename, std::ios::binary);
-    if (!file) return false;
+bool WriteToSharedMemory(const char* mapName, int width, int height, const std::vector<uint8_t>& data) {
+    
+    //need to know exactly how big the memory block is. It will be the size of the raw pixels + 8 bytes (two integers to store width and height)
+    size_t totalSize = sizeof(int) * 2 + data.size();
 
-    BITMAPFILEHEADER fileHeader = {};
-    fileHeader.bfType = 0x4D42; // "BM"
-    fileHeader.bfSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + data.size();
-    fileHeader.bfOffBits = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
+    // Ask the OS to find the memory block Python created
+    HANDLE hMapFile = OpenFileMappingA(
+        FILE_MAP_ALL_ACCESS,                 //permission to read and write
+        FALSE,                               //Do not inherit the name
+        mapName                              // The global string name Python used
+    );
 
-    BITMAPINFOHEADER infoHeader = {};
-    infoHeader.biSize = sizeof(BITMAPINFOHEADER);
-    infoHeader.biWidth = width;
-    infoHeader.biHeight = -height; // Top-down DIB
-    infoHeader.biPlanes = 1;
-    infoHeader.biBitCount = 32;
-    infoHeader.biCompression = BI_RGB;
+    if (hMapFile == NULL) {
+        std::cerr << "Could not open file mapping object (" << GetLastError() << ").\n";
+        return false;
+    }
+    
+    // Map the memory into our C++ process address space to write to it
+    LPVOID pBuf = MapViewOfFile(
+        hMapFile, 
+        FILE_MAP_ALL_ACCESS, 
+        0, 0, 
+        totalSize
+    );
 
-    file.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
-    file.write(reinterpret_cast<const char*>(&infoHeader), sizeof(infoHeader));
-    file.write(reinterpret_cast<const char*>(data.data()), data.size());
+    if (pBuf == NULL) {
+        std::cerr << "Could not map view of file (" << GetLastError() << ").\n";
+        CloseHandle(hMapFile);
+        return false;
+    }
+
+    // Write the Width and Height at the very beginning of the memory block (An int is 4 bytes, so this takes up the first 8 bytes of the block)
+    int* pHeader = static_cast<int*>(pBuf);
+    pHeader[0] = width;
+    pHeader[1] = height;
+
+    //Shift our pointer forward by 2 integers (8 bytes). This points exactly to where the pixel data should begin
+    uint8_t* pPixels = reinterpret_cast<uint8_t*>(pHeader + 2);
+    
+    //Blast the raw pixels straight from the GPU into the Shared Memory!
+    memcpy(pPixels, data.data(), data.size());
+
+    // Clean up our local C++ pointers (The memory isn't destroyed because Python still holds the master handle)
+    UnmapViewOfFile(pBuf);
+    CloseHandle(hMapFile);
+
+    
+
     return true;
 }
 
+
 int main(int argc, char* argv[]) {
-    std::string outputPath = "../../scratch/screenshot.bmp";
+    std::string mapName = "Local\\KikoDXGIFrame";
     if (argc > 1) {
-        outputPath = argv[1];
+        mapName = argv[1];
     }
+
 
     ID3D11Device* d3dDevice = nullptr;
     ID3D11DeviceContext* d3dContext = nullptr;
@@ -128,10 +158,11 @@ int main(int argc, char* argv[]) {
 
         d3dContext->Unmap(stagingTexture, 0);
 
-        if (WriteBMP(outputPath.c_str(), width, height, imageData)) {
-            std::cout << "SUCCESS:" << outputPath << std::endl;
+        if (!WriteToSharedMemory(mapName.c_str(), width, height, imageData)) {
+            std::cerr << "Failed to write to shared memory!" << std::endl;
+            return 1;
         } else {
-            std::cerr << "Failed to write BMP file" << std::endl;
+            std::cout << "SUCCESS:" << mapName << std::endl;
         }
     } else {
         std::cerr << "Failed to map staging texture" << std::endl;
