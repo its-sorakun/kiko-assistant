@@ -264,28 +264,8 @@ def read_active_window_content() -> str:
                 result = subprocess.run([exe_file, target_exe_name], capture_output=True, text=True, check=True)
                 mem_output = result.stdout.strip()
                 if mem_output:
-                    # Parse the PID blocks outputted by memory_scanner.cpp
-                    # Take the last 4000 characters of EACH process to guarantee we capture the renderer process heap
-                    import re
-                    blocks = re.split(r'--- START PID \d+ ---', mem_output)
-                    sampled_output = []
-                    for block in blocks:
-                        clean_block = re.sub(r'--- END PID \d+ ---', '', block).strip()
-                        if not clean_block: continue
-                        
-                        # The JS heap (where chats live) can be anywhere in the address space.
-                        # We take a 15,000-character cross-section (start, middle, end) of each process.
-                        if len(clean_block) > 15000:
-                            mid = len(clean_block) // 2
-                            start_chunk = clean_block[:5000]
-                            mid_chunk = clean_block[mid-2500 : mid+2500]
-                            end_chunk = clean_block[-5000:]
-                            
-                            sampled_output.append(f"{start_chunk}\n... [TRUNCATED MEMORY SPACE] ...\n{mid_chunk}\n... [TRUNCATED MEMORY SPACE] ...\n{end_chunk}")
-                        else:
-                            sampled_output.append(clean_block)
-                    
-                    mem_output = "\n\n--- NEXT PROCESS HEAP ---\n\n".join(sampled_output)
+                    from tools.memory_rag import semantic_memory_filter
+                    mem_output = semantic_memory_filter(mem_output, k=7)
             except Exception as e:
                 print(f"   [⚠️ Memory Scanner failed: {e}]")
                 
