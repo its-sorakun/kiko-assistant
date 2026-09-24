@@ -27,3 +27,4 @@ Release/
 *.pdb
 *.ilk
 scratch/
+dxgi_capture_backup.cpp
