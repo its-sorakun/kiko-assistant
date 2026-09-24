@@ -135,7 +135,7 @@ When Kiko is asked to read the contents of an active application, filesystem hoo
 **File:** `tools/vision.py` -> `analyze_screen()`
 
 When text extraction isn't enough (like analyzing a video game state or reading an image), Kiko invokes a custom C++ tool (`dxgi_capture.exe`) that hooks the OS Desktop Window Manager (DWM) via the DXGI Desktop Duplication API.
-- **Direct GPU Ripping:** This rips the raw frame buffer directly from the GPU VRAM in roughly 1ms, dumping it to a lightweight `.bmp`.
+- **Direct GPU Ripping & IPC Shared Memory:** This rips the raw frame buffer directly from the GPU VRAM in roughly 1ms. To completely eliminate SSD I/O bottlenecks and disk wear, the C++ executable bypasses `.bmp` files entirely. It constructs a Win32 Inter-Process Communication (IPC) Memory Mapped block (Shared Memory) and blasts the raw BGRA pixel array directly into Python's memory space, where Pillow mathematically rebuilds the physical image grid instantaneously.
 - **Dynamic MPO/GDI Fallback:** If the game utilizes Multi-Plane Overlays (MPO) or Kernel Anti-Cheat (e.g., Genshin Impact) that causes DXGI to capture a black screen hole, the vision tool autonomously detects the zero-variance frame (`ImageStat.mean < 1.0`). It instantly drops down to a legacy Win32 GDI `BitBlt` capture (`ImageGrab.grab(all_screens=True)`). This leverages the `CAPTUREBLT` flag to violently force the Windows DWM to composite all hardware planes, bypassing the anti-cheat blackout.
 - **Multimodal Integration:** The final raw image bytes are piped directly into Gemini's multimodal vision encoder (`gemini-3.5-flash-lite`) natively, allowing Kiko to "see" the HUD, read quests, and parse visual context without fragile OCR scraping.
 
