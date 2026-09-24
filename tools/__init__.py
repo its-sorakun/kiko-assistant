@@ -1,3 +1,9 @@
+# Copyright (C) 2026 Senpai
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
 # Aggregating the modular tools here so main.py doesn't have to change import paths. This keeps the flat API surface intact for the LLM tool schemas while separating the underlying mechanics.
 from .process import launch_program, force_kill_process
 from .telemetry import get_system_stats, get_hardware_details

@@ -1,3 +1,9 @@
+# Copyright (C) 2026 Senpai
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
 # Invokes native OS power state routines via shutdown.exe and user32.dll. 
 # Unlocking the PC programmatically is restricted by the Secure Attention Sequence (SAS) and the Winlogon sandbox.
 import subprocess

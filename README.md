@@ -83,3 +83,8 @@ Execute the main script from your terminal:
 python main.py
 ```
 Kiko will initialize the chat session. You can immediately begin interacting via natural language commands to inspect your system, launch applications, or manipulate background media.
+
+## License
+
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. 
+See the [LICENSE](LICENSE) file for more details.

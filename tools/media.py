@@ -1,3 +1,9 @@
+# Copyright (C) 2026 Senpai
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
 # Hooking into the asynchronous Windows Runtime (WinRT) SMTC pipeline instead of faking media keypresses. This allows iterating through all suspended background sessions (like Spotify) and piping transport controls directly to specific applications, bypassing whatever browser happens to dominate the global DWM media session.
 import asyncio
 

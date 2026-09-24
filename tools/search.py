@@ -1,3 +1,9 @@
+# Copyright (C) 2026 Senpai
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
 # have to go all through this just to ensure model doesn't hallucinates.
 import urllib.parse
 import urllib.request
