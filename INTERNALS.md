@@ -100,7 +100,7 @@ To circumvent LLM hallucinations without relying on expensive, rate-limited thir
 - **Event-Driven DOM Stripping:** To prevent the massive HTML overhead of target webpages from crashing the LLM's context window, a second state machine (`WebContentParser`) is deployed. Taking advantage of `HTMLParser`'s event-driven callback architecture, it flips a boolean flag upon encountering `<script>`, `<style>`, or metadata opening tags. The `handle_data` event actively ignores incoming streams while this flag is active, mechanically throwing away all backend code and styling rules on the fly with zero memory overhead. The resulting pure text is capped at 3000 characters and injected directly into Kiko's context window alongside the DuckDuckGo snippets.
 
 ## 9. Global Master File Table (MFT) Scanner
-**File:** `mft_scanner/fast_search.cpp`, `mft_scanner/__init__.py` -> `perform_global_search()`
+**File:** `tools/mft_scanner/fast_search.cpp`, `tools/mft_scanner/__init__.py` -> `perform_global_search()`
 
 To provide instantaneous, system-wide file search without relying on the slow Windows Indexing Service, Kiko hooks directly into the NTFS Master File Table.
 - **Kernel-Level MFT Access**: A custom C++ executable leverages `DeviceIoControl` with `FSCTL_ENUM_USN_DATA` to read raw MFT entries directly from disk sectors, entirely bypassing high-level user-space directory traversal.

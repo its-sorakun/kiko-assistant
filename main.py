@@ -19,7 +19,7 @@ from tools import (
     copy_to_clipboard
 )
 from tools.vision import analyze_screen
-from mft_scanner import perform_global_search
+from tools.mft_scanner import perform_global_search
 import sys
 
 # Force UTF-8 encoding for standard output so Windows console doesn't crash on Kiko's emojis
@@ -148,7 +148,7 @@ def main():
     subprocess.run(["taskkill", "/F", "/IM", "cpu_monitor.exe"], capture_output=True)
     
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    daemon_dir = os.path.join(base_dir, "cpu_monitor", "cpu_monitor", "x64", "Debug")
+    daemon_dir = os.path.join(base_dir, "tools", "cpu_monitor", "cpu_monitor", "x64", "Debug")
     daemon_path = os.path.join(daemon_dir, "cpu_monitor.exe")
     
     if os.path.exists(daemon_path):

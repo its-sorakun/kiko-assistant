@@ -246,7 +246,7 @@ def read_active_window_content() -> str:
         print(f"   [⚡ Triggering Direct Memory Scanner on '{target_exe_name}'...]")
         
         import subprocess
-        scanner_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "memory_scanner")
+        scanner_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory_scanner")
         cpp_file = os.path.join(scanner_dir, "memory_scanner.cpp")
         exe_file = os.path.join(scanner_dir, "memory_scanner.exe")
         
