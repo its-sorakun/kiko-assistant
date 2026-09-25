@@ -85,8 +85,8 @@ Relying on the `start` shell command triggers GUI error dialogs when an executab
 
 To provide long-term state across sessions, Kiko utilizes a dual-layer SQLite memory architecture, intentionally bypassing abstracted vector frameworks like Langchain or ChromaDB to keep the mechanical process transparent.
 - **Explicit Identity Store:** A traditional Key-Value table (`core_preferences`) persists explicit facts about the user. These can be retrieved dynamically or injected into the system prompt upon boot.
-- **Fuzzy Semantic Engine (RAG):** Conversational history is continuously embedded via the Gemini API (generating 3072-dimensional arrays). The resulting float arrays are packed into raw C-level binary BLOBs using `struct.pack('f' * 3072, ...)` and committed to the `semantic_memory` table.
-- **Native Retrieval:** Upon each user prompt, the query is embedded and evaluated against the database using a brute-force linear Cosine Similarity scan in pure Python. The dot-product and magnitude calculations isolate the most contextually relevant historical exchange, which is seamlessly injected into the LLM's context window prior to generating a response.
+- **Fuzzy Semantic Engine (RAG):** Conversational history and visual/textual memory contexts are continuously embedded via the Gemini API (generating 3072-dimensional arrays). The resulting float arrays are packed and managed by a native SQLite database (`semantic_memory`).
+- **GPU-Accelerated FAISS Retrieval:** Previously relying on CPU-bound brute-force linear Cosine Similarity math, the system was bottlenecked by massive context arrays (like raw heap memory dumps). This has been upgraded to a PyTorch hardware-accelerated pipeline. Upon each user prompt, the query is embedded and passed into a local `FAISS` index deployed on the GPU via CUDA 12.4. The PyTorch tensor math isolates the most contextually relevant historical exchange almost instantaneously, which is seamlessly injected into the LLM's context window prior to generating a response.
 
 ## 8. Autonomous Web Scraping & Bot Evasion
 **File:** `tools/search.py`
