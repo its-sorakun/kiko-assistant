@@ -12,12 +12,14 @@ ai/
 
 # other stuff
 assistant.md
+paused_implementations.md
 ztest.py
 test_vscode.py
 tools_backup.py
 test_smtc.ps1
 db/kiko_cortex.db
 kiko.bat
+future_plans.md
 # Visual Studio Build Artifacts (C++ cpu_monitor)
 .vs/
 x64/
