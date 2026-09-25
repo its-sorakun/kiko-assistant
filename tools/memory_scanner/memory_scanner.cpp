@@ -32,13 +32,8 @@ bool IsHumanReadable(const std::wstring& str) {
     if (space_count < 2) return false;
     if (alpha_count < (str.length() / 2)) return false;
     
-    // Reject strings with too many symbols (likely JSON, JS code, CSS)
-    if (symbol_count > (str.length() / 4)) return false;
-    
-    // Reject common JS/JSON signatures
+    // Reject common JS functions but ALLOW JSON (because Electron apps store chat in JSON)
     if (str.find(L"function(") != std::wstring::npos) return false;
-    if (str.find(L"{\\n") != std::wstring::npos) return false;
-    if (str.find(L"{\"") != std::wstring::npos) return false;
     
     return true;
 }
@@ -58,11 +53,7 @@ bool IsHumanReadableASCII(const std::string& str) {
     
     if (space_count < 2) return false;
     if (alpha_count < (str.length() / 2)) return false;
-    if (symbol_count > (str.length() / 4)) return false;
-    
     if (str.find("function(") != std::string::npos) return false;
-    if (str.find("{\\n") != std::string::npos) return false;
-    if (str.find("{\"") != std::string::npos) return false;
     
     return true;
 }
