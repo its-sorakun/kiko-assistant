@@ -30,3 +30,6 @@ Release/
 *.ilk
 scratch/
 dxgi_capture_backup.cpp
+
+# Virtual Environments
+venv/
