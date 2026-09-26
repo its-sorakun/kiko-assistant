@@ -54,14 +54,26 @@ def toggle_bluetooth_power(enable: bool) -> str:
     if not os.path.exists(ps_script):
         return "CRITICAL SYSTEM ERROR: ToggleBluetooth.ps1 script is missing."
         
+    # Dynamically inject WinRT UWP permission via CapabilityAccessManager
+    from permissions_handle import toggle_windows_permission, get_windows_permission_status
+    was_enabled = get_windows_permission_status('radios')
+    if not was_enabled:
+        toggle_windows_permission('radios', True)
+
     print(f"Kiko is trying to turn {action.upper()} the Bluetooth radio natively...", flush=True)
     try:
         result = subprocess.run(
             ["powershell", "-ExecutionPolicy", "Bypass", "-File", ps_script, "-BluetoothStatus", action],
             capture_output=True, text=True, check=True
         )
-        return f"Successfully toggled Bluetooth radio to {action} via PowerShell proxy."
+        msg = f"Successfully toggled Bluetooth radio to {action} via PowerShell proxy."
     except subprocess.CalledProcessError as e:
-        return f"CRITICAL SYSTEM ERROR: PowerShell toggle failed. {e.stderr}"
+        msg = f"CRITICAL SYSTEM ERROR: PowerShell toggle failed. {e.stderr}"
     except Exception as e:
-        return f"CRITICAL SYSTEM ERROR: {str(e)}"
+        msg = f"CRITICAL SYSTEM ERROR: {str(e)}"
+        
+    # Lock the capability back down if Kiko had to forcefully unlock it
+    if not was_enabled:
+        toggle_windows_permission('radios', False)
+        
+    return msg
