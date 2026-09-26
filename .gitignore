@@ -20,6 +20,9 @@ test_smtc.ps1
 db/kiko_cortex.db
 kiko.bat
 future_plans.md
+Legacy/
+stash/
+md/
 # Visual Studio Build Artifacts (C++ cpu_monitor)
 .vs/
 x64/
