@@ -19,7 +19,7 @@ from .clipboard import copy_to_clipboard
 from .vision import analyze_screen
 from .mft_scanner import perform_global_search
 from .weather import get_current_weather, get_hourly_forcast, get_weekly_forcast
-from .permissions_handle import toggle_location_permission
+from .permissions_handle import toggle_windows_permission
 
 __all__ = [
     "launch_program", 

@@ -17,7 +17,7 @@ from tools import (
     manage_power_state, memorize_preferences, get_all_preferences, perform_web_search,
     list_directory_contents, open_file, advanced_pdf_query, draft_and_copy_job_email,
     copy_to_clipboard, analyze_screen, perform_global_search,
-    get_current_weather, get_hourly_forcast, get_weekly_forcast, toggle_location_permission
+    get_current_weather, get_hourly_forcast, get_weekly_forcast, toggle_windows_permission
 )
 import sys
 
@@ -63,7 +63,7 @@ available_tools = [
     list_directory_contents, open_file, advanced_pdf_query, draft_and_copy_job_email,
     copy_to_clipboard, clear_short_term_memory, analyze_screen,
     get_current_weather, get_hourly_forcast, get_weekly_forcast,
-    toggle_location_permission
+    toggle_windows_permission
 ]
 
 system_instruction = f"""
@@ -78,7 +78,7 @@ If you ingest a massive amount of data (like a memory scanner dump) and are abou
 If the user asks you to read, summarize, or extract information from a PDF document, DO NOT try to read the raw file. You MUST use the `advanced_pdf_query` tool to retrieve the relevant chunks of the PDF.
 If the user asks you to draft a job application email, you must use your existing tools (like web search and pdf querying) to gather context (like company details, HR email, and deciding on the best resume). Once you have chosen the best resume, call the `draft_and_copy_job_email` tool. This tool will internally draft the perfect professional email and auto-copy it to the clipboard. Wait for its output, and then excitedly tell the user you've copied the drafted email to their clipboard!
 If you draft code snippets or anything else, use the `copy_to_clipboard` tool to automatically copy it to the Windows clipboard for senpai, and let him know you copied it!
-If the user asks about the weather, call the appropriate weather tool. If a weather tool returns a "CRITICAL SYSTEM ERROR" about location permissions being denied, do NOT hallucinate or guess the weather. Instead, ask the user if you can turn on Windows location permissions. If they say yes, use `toggle_location_permission(enable=True)`, re-run the weather tool, and then IMMEDIATELY turn the permission back off using `toggle_location_permission(enable=False)`. If they say no, ask them to provide their city name and pass it to the `city_name` argument of the weather tools instead. If they ask for weather EXACTLY N hours later, call `get_hourly_forcast`, read the data, and ONLY reply with the weather for that specific hour (do not dump the full 5-hour forecast). If they ask for an hourly forecast beyond 5 hours, politely tell them you only have 5 hours of data. Do NOT reply with the current weather data unless explicitly asked. Be a smart assistant, you know when to tell weather and when not, use your wisdom.
+If the user asks about the weather, call the appropriate weather tool. If a weather tool returns a "CRITICAL SYSTEM ERROR" about location permissions being denied, do NOT hallucinate or guess the weather. Instead, ask the user if you can turn on Windows location permissions. If they say yes, use `toggle_windows_permission(capability="location", enable=True)`, re-run the weather tool, and then IMMEDIATELY turn the permission back off using `toggle_windows_permission(capability="location", enable=False)`. If they say no, ask them to provide their city name and pass it to the `city_name` argument of the weather tools instead. If they ask for weather EXACTLY N hours later, call `get_hourly_forcast`, read the data, and ONLY reply with the weather for that specific hour (do not dump the full 5-hour forecast). If they ask for an hourly forecast beyond 5 hours, politely tell them you only have 5 hours of data. Do NOT reply with the current weather data unless explicitly asked. Be a smart assistant, you know when to tell weather and when not, use your wisdom.
 CRITICAL DIRECTIVE ON KNOWLEDGE:
 Your internal training data is permanently frozen and outdated. 
 You are STRICTLY FORBIDDEN from answering any questions about real-world facts, current events, video games, anime, movies, software versions, banners, or release dates using your own memory. 

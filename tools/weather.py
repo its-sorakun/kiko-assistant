@@ -4,7 +4,7 @@ import urllib.parse
 import json
 from datetime import datetime
 from dotenv import load_dotenv
-from .permissions_handle import get_location_permission_status
+from .permissions_handle import get_windows_permission_status
 
 # load environment variables natively to keep mechanisms visible and simple
 load_dotenv()
@@ -17,7 +17,7 @@ def get_location() -> dict:
     Returns a dictionary containing 'city', 'lat', and 'lon'.
     """
     # Enforce Windows-level permission checks before attempting IP geolocation
-    if not get_location_permission_status():
+    if not get_windows_permission_status("location"):
         return {"error": "CRITICAL SYSTEM ERROR: WINDOWS LOCATION PERMISSION IS CURRENTLY DENIED. DO NOT GUESS THE WEATHER. YOU MUST ASK THE USER FOR PERMISSION TO TURN ON LOCATION, OR ASK FOR A CITY NAME."}
         
     try:
