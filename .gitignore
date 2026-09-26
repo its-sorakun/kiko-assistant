@@ -23,6 +23,7 @@ future_plans.md
 Legacy/
 stash/
 md/
+.cache
 # Visual Studio Build Artifacts (C++ cpu_monitor)
 .vs/
 x64/
