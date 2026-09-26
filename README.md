@@ -32,14 +32,14 @@ Because Kiko is hooked directly into the OS rather than relying on clunky GUI au
 
 ## How It Works (The Reasoning Engine)
 
-At the core of Kiko is the `google.genai` SDK, leveraging the Gemini 3.1 Flash Lite model.
+At her core, Kiko is powered by the `google.genai` SDK, primarily relying on the Gemini 3.5 Flash Lite model for blazing-fast inference, with other models configured as fallbacks.
 
-Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing or regex string matching, Kiko delegates all reasoning to the generative model. 
+She entirely ditches the legacy assistant architecture of hardcoded `if/else` intent routing and regex string matching. Instead, she operates as a fully autonomous agentic loop:
 
-1. **Tool Schema Injection**: The local Python runtime defines a schema of available OS hooks (e.g., `control_system_media`, `get_active_window`, `force_kill_process`) and passes this to Gemini.
-2. **Dynamic Decision Making**: When a natural language command is provided (e.g., "Skip this song" or "Why is my PC running hot?"), Gemini determines exactly which native hook to invoke and extracts the necessary arguments.
-3. **Local Execution**: Gemini returns a hidden JSON payload to the local script. The Python runtime executes the Win32/WinRT bindings locally—Gemini never has direct access to the host machine.
-4. **Contextual Feedback**: The raw execution results are passed back to Gemini to format a natural, contextual response.
+1. **Dynamic Schema Injection**: On boot (and dynamically via hot-reloading), the local Python runtime defines a massive JSON schema of native OS hooks (e.g., `spotify_play_user_playlist`, `mft_search_file`, `force_kill_process`) and injects them directly into Gemini's tool-calling context.
+2. **Autonomous Tool Chaining**: When you issue a command, Kiko doesn't just trigger one function. She parses the underlying intent and autonomously chains multiple tools together. (e.g., Fetching the weather might involve checking OS permissions, requesting a bypass, modifying the registry, fetching the API, and reverting the registry).
+3. **Air-Gapped Execution**: Gemini makes the decisions, but it never touches your host machine directly. It simply returns a JSON payload of requested tool calls, which the local Python runtime securely executes via direct Win32/WinRT/C++ bindings.
+4. **Recursive Context Integration**: The raw execution results (like dumped heap memory, MFT search hits, or thermal sensor readouts) are fed back into her context window, allowing her to continuously reason about the current state of your PC before finally speaking to you.
 
 ## Core Capabilities & Implementation Details
 
