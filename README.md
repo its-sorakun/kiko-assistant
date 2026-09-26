@@ -22,6 +22,9 @@ Because the assistant is hooked directly into the OS, it exposes several core fe
 - **Autonomous Web Scraping & Deep-Dive Crawling**: Bypasses AI hallucinations by autonomously browsing the live internet. Fetches real-time search snippets via `lite.duckduckgo.com` and automatically deep-dives into target URLs to extract in-depth text content using event-driven HTML state machines.
 - **Agentic Job Application Orchestration**: Integrates web search and PDF RAG to autonomously evaluate resumes against company profiles, drafting strictly professional emails in an isolated environment.
 - **Native Win32 Clipboard Hooking**: Writes finalized text payloads (like email drafts or code snippets) directly into the host OS clipboard using `kernel32` and `user32` ctypes bindings.
+- **Native Bluetooth Device Management**: Utilizes a custom C++ binary (`bt_manager.exe`) bridging directly into `bluetoothapis.h`. Bypasses fragile UI toggles by physically injecting the `BLUETOOTH_SERVICE_ENABLE` flag onto the `GUID_AUDIO_SINK` service, allowing Kiko to forcefully connect or disconnect paired audio devices via kernel instructions.
+- **WinRT Master Radio Control**: Leverages PowerShell C#-style generic reflection to interface with the `Windows.Devices.Radios` WinRT API. As long as "Let apps control device radios" is enabled in Windows Privacy settings, Kiko can gracefully toggle the master physical Bluetooth radio power state dynamically, completely circumventing destructive PnP Device Driver reboots.
+- **Dynamic Capability Bypassing**: Natively hooks into the Windows Registry `ConsentStore` to autonomously grant herself locked UWP capabilities (like Radios and Geolocation) instantly before executing a restricted system payload, actively relocking the permission post-execution to maintain privacy without bothering the user for UI consent.
 
 ## How It Works (The Reasoning Engine)
 
