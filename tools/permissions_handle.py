@@ -2,7 +2,7 @@ import winreg
 
 def get_location_permission_status() -> bool:
     """
-    Checks if Windows location permissions are natively enabled for the current user.
+    Checks if Windows location permissions are natively enabled/disabled for the current user.
     """
     try:
         # Check global device setting (HKLM)
