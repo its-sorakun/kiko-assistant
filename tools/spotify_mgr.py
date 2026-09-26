@@ -1,7 +1,12 @@
 import os
 import spotipy
+import logging
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
+
+# Suppress annoying spotipy and urllib3 stdout HTTP warnings
+logging.getLogger("spotipy").setLevel(logging.CRITICAL)
+logging.getLogger("urllib3").setLevel(logging.CRITICAL)
 
 # Ensure environment variables are loaded
 load_dotenv()
@@ -75,6 +80,29 @@ def spotify_transfer_playback(target_device_name: str) -> str:
         # If exact match fails, just list available devices
         device_names = [d['name'] for d in devices]
         return f"Could not find '{target_device_name}'. Available devices are: {', '.join(device_names)}."
+    except Exception as e:
+        return f"System Error: {str(e)}"
+
+def spotify_get_devices() -> str:
+    """
+    Retrieves all available Spotify devices that playback can be transferred to.
+    """
+    print("   [🎵 Kiko is querying available Spotify devices...]")
+    try:
+        sp = get_spotify_client()
+        devices_response = sp.devices()
+        devices = devices_response.get('devices', [])
+        
+        if not devices:
+            return "No active Spotify devices found. Please open Spotify on your PC or Phone."
+            
+        output = ["Available Spotify Devices:"]
+        for d in devices:
+            active_str = " (Active)" if d['is_active'] else ""
+            output.append(f"- {d['name']} ({d['type']}){active_str}")
+        return "\n".join(output)
+    except spotipy.exceptions.SpotifyException as e:
+        return f"Spotify API Error: {str(e)}"
     except Exception as e:
         return f"System Error: {str(e)}"
 

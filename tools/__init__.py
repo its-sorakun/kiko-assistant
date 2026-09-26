@@ -22,7 +22,7 @@ from .weather import get_current_weather, get_hourly_forcast, get_weekly_forcast
 from .permissions_handle import toggle_windows_permission
 from .bluetooth_mgr import get_bluetooth_devices, connect_bluetooth_device, toggle_bluetooth_power
 from .spotify_mgr import (
-    spotify_search_and_play, spotify_transfer_playback, spotify_create_and_fill_playlist, 
+    spotify_search_and_play, spotify_transfer_playback, spotify_get_devices, spotify_create_and_fill_playlist, 
     spotify_get_queue, spotify_get_user_playlists, spotify_play_user_playlist, spotify_get_user_stats
 )
 
@@ -57,6 +57,7 @@ __all__ = [
     "toggle_bluetooth_power",
     "spotify_search_and_play",
     "spotify_transfer_playback",
+    "spotify_get_devices",
     "spotify_create_and_fill_playlist",
     "spotify_get_queue",
     "spotify_get_user_playlists",
