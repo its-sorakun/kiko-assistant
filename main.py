@@ -17,7 +17,8 @@ from tools import (
     manage_power_state, memorize_preferences, get_all_preferences, perform_web_search,
     list_directory_contents, open_file, advanced_pdf_query, draft_and_copy_job_email,
     copy_to_clipboard, analyze_screen, perform_global_search,
-    get_current_weather, get_hourly_forcast, get_weekly_forcast, toggle_windows_permission
+    get_current_weather, get_hourly_forcast, get_weekly_forcast, toggle_windows_permission,
+    get_bluetooth_devices, connect_bluetooth_device, toggle_bluetooth_power
 )
 import sys
 
@@ -63,7 +64,8 @@ available_tools = [
     list_directory_contents, open_file, advanced_pdf_query, draft_and_copy_job_email,
     copy_to_clipboard, clear_short_term_memory, analyze_screen,
     get_current_weather, get_hourly_forcast, get_weekly_forcast,
-    toggle_windows_permission
+    toggle_windows_permission, get_bluetooth_devices, connect_bluetooth_device,
+    toggle_bluetooth_power
 ]
 
 system_instruction = f"""

@@ -20,6 +20,7 @@ from .vision import analyze_screen
 from .mft_scanner import perform_global_search
 from .weather import get_current_weather, get_hourly_forcast, get_weekly_forcast
 from .permissions_handle import toggle_windows_permission
+from .bluetooth_mgr import get_bluetooth_devices, connect_bluetooth_device, toggle_bluetooth_power
 
 __all__ = [
     "launch_program", 
@@ -46,5 +47,8 @@ __all__ = [
     "get_current_weather",
     "get_hourly_forcast",
     "get_weekly_forcast",
-    "toggle_location_permission"
+    "toggle_windows_permission",
+    "get_bluetooth_devices",
+    "connect_bluetooth_device",
+    "toggle_bluetooth_power"
 ]
