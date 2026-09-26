@@ -4,12 +4,15 @@ Kiko is an experimental, event-driven virtual assistant designed to explore the 
 
 Instead of treating the operating system as a black box and interacting via high-level graphical UI automation (like simulated mouse clicks or fragile OCR scraping), the project is engineered to drop down to the underlying mechanisms. Kiko interfaces directly with the native Win32 API, Windows Management Instrumentation (WMI), and the asynchronous Windows Runtime (WinRT).
 
+Unlike other virtual assistants that just call an API for text generation, add a voice, and call it a day, Kiko actually knows how to use your computer. She can read your files, understand what's on your screen, change your settings, and control your music, launch/kill your apps just like a real person sitting at your computer.
+
 > For a highly verbose breakdown of the specific kernel and user-space hooks employed, refer to [INTERNALS.md](INTERNALS.md).
 
 ## What Kiko Can Do
 
 Because Kiko is hooked directly into the OS rather than relying on clunky GUI automation, she wields god-tier control over your Windows environment. She can do things most assistants simply cannot:
 
+- **Casual Chat**: She can chat with you just like a normal AI assistant, understanding your emotions and responding accordingly. *(Example: "Kiko, I had a really long day today, can we just talk?" or "Kiko, I just watched Tenki No Ko, Makoto Shinkai nailed it again, you know?")*
 - **Ultra-Fast Global File Search**: Finds *any* file across all your hard drives in milliseconds using a raw NTFS Master File Table scanner. It completely bypasses the agonizingly slow Windows Indexing Service. *(Example: "Kiko, where is my monthly transaction report xlsx file kept? Open the parent folder if you find it.")*
 - **Instant Background Media Control**: Hooks into the WinRT System Media Transport Controls to perfectly manage your music in the background, even if a browser tab stole your global media keys. *(Example: "Kiko, pause the music." or "Kiko, skip this music." or "Kiko, isn't the currently playing music good? What song is this?")*
 - **Real CPU Thermals**: Reads your actual CPU die temperatures directly through a custom C++ daemon interfacing with AMD's Ring-0 monitoring driver, entirely bypassing Windows' useless WMI placeholders. *(Example: "Kiko, why are my fans spinning so loud? Are my CPU thermals spiking?")*
