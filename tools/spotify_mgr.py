@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 # Ensure environment variables are loaded
 load_dotenv()
 
-# We need extensive scopes for playback modification, playlist creation, reading user playlists, and reading user stats.
+# Need extensive scopes for playback modification, playlist creation, reading user playlists, and reading user stats.
 SCOPE = "user-read-playback-state user-modify-playback-state playlist-modify-private playlist-modify-public user-library-modify playlist-read-private user-top-read"
 
 _sp = None
@@ -155,7 +155,8 @@ def spotify_get_user_playlists() -> str:
         
         output = ["Your Spotify Playlists:"]
         for p in items:
-            output.append(f"- {p['name']} ({p['tracks']['total']} tracks)")
+            track_count = p.get('tracks', {}).get('total', '?')
+            output.append(f"- {p['name']} ({track_count} tracks)")
         return "\n".join(output)
     except spotipy.exceptions.SpotifyException as e:
         return f"Spotify API Error: {str(e)}"
