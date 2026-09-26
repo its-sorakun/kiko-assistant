@@ -65,7 +65,7 @@ Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing 
 - Windows 10 or Windows 11 (required for WinRT SMTC hooks)
 - An Nvidia GPU supporting CUDA 12.4+ (highly recommended to prevent the FAISS/PyTorch RAG engines from falling back to agonizingly slow CPU computation).
 - A Gemini API Key from Google AI Studio
-- For temperature polling: AMD Ryzen CPU and AMD Ryzen Master Monitoring SDK installed on the host system
+- For temperature polling: AMD Ryzen CPU and AMD Ryzen Master Monitoring SDK installed on the host system (currently supports only AMD Ryzen CPUs)
 
 ### Installation
 
