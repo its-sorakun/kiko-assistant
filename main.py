@@ -11,17 +11,7 @@ import datetime
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
-from tools import (
-    launch_program, get_system_stats, open_directory, get_active_window, get_hardware_details,
-    query_registry_value, force_kill_process, read_active_window_content, control_system_media,
-    manage_power_state, memorize_preferences, get_all_preferences, perform_web_search,
-    list_directory_contents, open_file, advanced_pdf_query, draft_and_copy_job_email,
-    copy_to_clipboard, analyze_screen, perform_global_search,
-    get_current_weather, get_hourly_forcast, get_weekly_forcast, toggle_windows_permission,
-    get_bluetooth_devices, connect_bluetooth_device, toggle_bluetooth_power,
-    spotify_search_and_play, spotify_transfer_playback, spotify_create_and_fill_playlist,
-    spotify_get_queue, spotify_get_user_playlists, spotify_play_user_playlist, spotify_get_user_stats
-)
+import tools
 import sys
 
 # Force UTF-8 encoding for standard output so Windows console doesn't crash on Kiko's emojis
@@ -58,19 +48,21 @@ def clear_short_term_memory() -> str:
     needs_memory_clear = True
     return "Short-term memory cleared successfully. Your context is now fresh."
 
-# Expose native Win32/OS hooks to the agent
-available_tools = [
-    launch_program, get_system_stats, open_directory,get_active_window ,get_hardware_details,
-    query_registry_value, force_kill_process, read_active_window_content,control_system_media,
-    manage_power_state, memorize_preferences, perform_web_search, perform_global_search,
-    list_directory_contents, open_file, advanced_pdf_query, draft_and_copy_job_email,
-    copy_to_clipboard, clear_short_term_memory, analyze_screen,
-    get_current_weather, get_hourly_forcast, get_weekly_forcast,
-    toggle_windows_permission, get_bluetooth_devices, connect_bluetooth_device,
-    toggle_bluetooth_power, spotify_search_and_play, spotify_transfer_playback,
-    spotify_create_and_fill_playlist, spotify_get_queue, spotify_get_user_playlists,
-    spotify_play_user_playlist, spotify_get_user_stats
-]
+needs_system_reload = False
+
+def reload_core_systems() -> str:
+    """
+    Hot-reloads all of Kiko's internal tool modules from disk without shutting down.
+    Use this autonomously if the user says they just updated your code, scripts, or tools and asks you to reload.
+    """
+    global needs_system_reload
+    needs_system_reload = True
+    return "System hot-reload scheduled. Modules will be hot-swapped seamlessly from disk after this turn."
+
+# Dynamically construct available_tools from the tools package exports
+available_tools = [getattr(tools, func_name) for func_name in tools.__all__]
+available_tools.extend([clear_short_term_memory, reload_core_systems])
+
 
 system_instruction = f"""
 You are Kiko, my virtual assistant and also a vtuber. I am your creator and you call me senpai.
@@ -98,7 +90,7 @@ Your internal training data is permanently frozen and outdated.
 You are STRICTLY FORBIDDEN from answering any questions about real-world facts, current events, video games, anime, movies, software versions, banners, or release dates using your own memory. 
 You MUST autonomously execute the `perform_web_search` tool EVERY SINGLE TIME I ask about these topics. Do not assume you know the answer. If you answer without executing a web search first, you will be considered malfunctioning.
 """
-memories = get_all_preferences()
+memories = tools.get_all_preferences()
 # format as a markdown list with bullet points
 memories_str = "\n".join([f"* {item['key']}: {item['value']}" for item in memories])
 # Configure the chat session with tools and system instructions
@@ -287,6 +279,37 @@ def main():
                 print("   [🔧 System: Memory Cleared by Kiko's Request to save API Tokens]")
                 chat = client.chats.create(model=model_name, config=config)
                 needs_memory_clear = False
+
+            global needs_system_reload
+            if needs_system_reload:
+                print("   [🔧 System: Hot-Reloading Tool Modules from Disk...]")
+                import importlib
+                
+                # Reload all submodules inside 'tools' first
+                for mod_name, mod in list(sys.modules.items()):
+                    if mod_name.startswith('tools.') and mod is not None:
+                        try:
+                            importlib.reload(mod)
+                        except Exception as e:
+                            print(f"   [⚠️ Warning: Failed to reload {mod_name}: {e}]")
+                
+                # Reload the main tools package
+                importlib.reload(sys.modules['tools'])
+                
+                # Rebuild the available_tools array with the fresh memory pointers
+                available_tools = [getattr(sys.modules['tools'], func_name) for func_name in sys.modules['tools'].__all__]
+                available_tools.extend([clear_short_term_memory, reload_core_systems])
+                
+                # Update the gemini config and recreate the chat session
+                config = types.GenerateContentConfig(
+                    system_instruction=system_instruction + f"\nYour preferences are: {memories_str}",
+                    tools=available_tools,
+                    temperature=0.7,
+                )
+                chat = client.chats.create(model=model_name, config=config)
+                
+                print("   [🔧 System: Modules successfully hot-swapped!]")
+                needs_system_reload = False
 
         except KeyboardInterrupt:
             # Handle Ctrl+C termination
