@@ -18,6 +18,8 @@ from .job_application_helper import draft_and_copy_job_email
 from .clipboard import copy_to_clipboard
 from .vision import analyze_screen
 from .mft_scanner import perform_global_search
+from .weather import get_current_weather, get_hourly_forcast, get_weekly_forcast
+from .permissions_handle import toggle_location_permission
 
 __all__ = [
     "launch_program", 
@@ -40,5 +42,9 @@ __all__ = [
     "draft_and_copy_job_email",
     "copy_to_clipboard",
     "analyze_screen",
-    "perform_global_search"
+    "perform_global_search",
+    "get_current_weather",
+    "get_hourly_forcast",
+    "get_weekly_forcast",
+    "toggle_location_permission"
 ]
