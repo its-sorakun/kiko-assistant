@@ -1,5 +1,4 @@
 # Could have used C++ but I chose python, but Why Python winreg instead of C++ WinRT?
-# 
 # I did some online research and found out that Windows permissions (Location, Camera, Mic) are enforced by the Capability Access Manager Service (camsvc), which reads its policies directly from the ConsentStore registry hive and official WinRT APIs (e.g., AppCapability::RequestAccessAsync) only allow an application to request permission for itself, Microsoft does not expose a public C++ API to globally flip the master OS toggle for all applications.
 # The only native way to globally toggle the master OS switch (mimicking the Windows Settings UI) is to forcefully overwrite the ConsentStore keys. 
 # Doing this in C++ merely acts as a wrapper around RegOpenKeyEx/RegSetValueEx, which introduces compilation overhead without exposing any lower-level kernel behavior. 
