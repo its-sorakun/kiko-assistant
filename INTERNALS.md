@@ -17,7 +17,7 @@ When executing a command-line interface, the "active window" defaults inherently
 - Parsing the title of the underlying window permits extraction of active code editor filenames, facilitating filesystem traversal and raw disk reads.
 
 ## 3. WinRT System Media Transport Controls (SMTC)
-**File:** `tools.py` -> `control_system_media()`
+**File:** `tools/windowing.py` -> `control_system_media()`
 
 Modern media control is routed through the asynchronous WinRT pipeline rather than via simulated keypresses.
 - The `winsdk` projection accesses `Windows.Media.Control`.
@@ -177,3 +177,19 @@ Modern Windows permissions (Location, Radios, Camera, Microphone) are enforced b
 - **Native Registry Exploitation**: Rather than relying on C++ wrappers (which would merely obfuscate the operation), Kiko utilizes Python's built-in `winreg` module to drop directly into the `ConsentStore` (`HKLM\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore`).
 - **Global Override**: By executing with Administrator privileges, Kiko can forcefully overwrite the `Value` strings to `Allow` or `Deny` on both the global device level (HKLM) and the per-user level (HKCU). 
 - **Dynamic Unlocking**: This allows Kiko to behave autonomously. Before she executes an API call that she knows the Windows Kernel blocks by default (such as Geolocation polling or WinRT Radio toggling), she natively rips open the OS permission boundary, executes the blocked payload, and instantly locks the permission back down, ensuring total operational freedom without compromising host privacy.
+
+## 19. Dynamic Module Hot-Swapping
+**File:** `main.py` -> `reload_core_systems()`
+
+To enable live code editing without breaking Kiko's active conversation loop or discarding her short-term memory, her architectural footprint avoids hardcoded static imports in favor of dynamic module generation.
+- **Dynamic Pointers**: `main.py` constructs the `available_tools` array at runtime utilizing `getattr(tools, func_name)`. The Google Gemini SDK stores these direct function pointers in memory.
+- **Autonomous Hot-Reloading**: Kiko exposes a native `reload_core_systems` tool to the LLM. When triggered, the Python runtime suspends the chat loop, sweeps through `sys.modules`, and executes `importlib.reload()` across all `tools.*` submodules. 
+- **Schema Rebuilding**: The tool dynamically pulls the fresh Python code from disk into RAM, recalculates `tools.__all__`, updates the `available_tools` function pointers, and hot-swaps the underlying `genai.Client` config seamlessly, enabling Kiko to update her own code while she is running.
+
+## 20. Hybrid Spotify Orchestration
+**File:** `tools/spotify_mgr.py`
+
+While WinRT natively handles generic transport controls (play/pause/skip) locally with zero latency, complex orchestrations (querying the global catalog, fetching playlists, retrieving user top tracks, playing specific URIs) require formal web APIs.
+- **Spotify Web API Integration**: Kiko integrates `spotipy` to communicate with the official Spotify Web API to handle advanced library management.
+- **Cache Redirection**: To prevent subprocess CWD pollution from spawning orphaned `.cache` files or throwing `SpotifyOauthError` exceptions when Kiko natively launches `main.py` from different shell contexts, the OAuth token `.cache` is strictly hardcoded to an absolute path utilizing `os.path.abspath(__file__)`.
+- **Intelligent Architectural Fallback**: Kiko is instructed to use the Web API exclusively for data retrieval and complex queueing. However, for basic playback controls, she bypasses the Web API entirely and falls back to her native WinRT hooks (Section 3). This architectural decision completely eliminates API rate limits and web-latency for simple pause/skip commands, keeping the assistant blazingly fast.

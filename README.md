@@ -25,6 +25,7 @@ Because the assistant is hooked directly into the OS, it exposes several core fe
 - **Native Bluetooth Device Management**: Utilizes a custom C++ binary (`bt_manager.exe`) bridging directly into `bluetoothapis.h`. Bypasses fragile UI toggles by physically injecting the `BLUETOOTH_SERVICE_ENABLE` flag onto the `GUID_AUDIO_SINK` service, allowing Kiko to forcefully connect or disconnect paired audio devices via kernel instructions.
 - **WinRT Master Radio Control**: Leverages PowerShell C#-style generic reflection to interface with the `Windows.Devices.Radios` WinRT API. As long as "Let apps control device radios" is enabled in Windows Privacy settings, Kiko can gracefully toggle the master physical Bluetooth radio power state dynamically, completely circumventing destructive PnP Device Driver reboots.
 - **Dynamic Capability Bypassing**: Natively hooks into the Windows Registry `ConsentStore` to autonomously grant herself locked UWP capabilities (like Radios and Geolocation) instantly before executing a restricted system payload, actively relocking the permission post-execution to maintain privacy without bothering the user for UI consent.
+- **Hybrid Spotify Architecture**: Integrates the official Spotify Web API via `spotipy` for complex orchestration (global catalog searches, fetching queues, playlist creation, querying top user tracks/artists, and device handoffs) while aggressively falling back to local WinRT SMTC hooks for instantaneous, zero-latency transport controls (pause/play/skip).
 
 ## How It Works (The Reasoning Engine)
 
@@ -55,12 +56,14 @@ Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing 
 - **Context Token Management**: To prevent raw heap dumps or intensive recursive web searches from exploding the LLM context window and triggering API rate limits, Kiko is armed with a short-term memory wipe tool. She can autonomously evaluate her own context bloat and wipe her session history on the fly before initiating heavy queries.
 - **Native Win32 Clipboard**: Enables Kiko to seamlessly push text payloads directly into the host OS clipboard utilizing `kernel32` and `user32` ctypes bindings, bypassing the need for external CLI binaries.
 - **Agentic Job Application Helper**: A dedicated orchestration workflow that fully automates job applications. When given a target HR email (either provided directly in chat or autonomously extracted from a target document), Kiko deduces the company name, performs a live web search for company details, and evaluates available resumes to select the best fit(If multiple resumes exists, it will select the best fit based on the job description and your field). She then passes the data to an isolated helper tool that drafts a strictly professional email (bypassing her persona) and natively injects the final draft directly into the clipboard.
+- **Dynamic Hot-Swapping**: Kiko's tools architecture dynamically resolves function pointers straight from module exports at runtime. Kiko is equipped with a `reload_core_systems` tool, allowing her to natively trigger Python's `importlib.reload()` on all her internal subsystems and rebuild her Gemini API schema dynamically without dropping the chat session loop, enabling live code editing.
 
 ## Configuration & Usage
 
 ### Prerequisites
-- Python 3.10+
+- Python 3.10 to 3.13 (Note: If using Python 3.14+, you must manually update `requirements.txt` to point to a newer PyTorch CUDA index like `cu126`, as `cu124` wheels are no longer compiled for newer Python releases).
 - Windows 10 or Windows 11 (required for WinRT SMTC hooks)
+- An Nvidia GPU supporting CUDA 12.4+ (highly recommended to prevent the FAISS/PyTorch RAG engines from falling back to agonizingly slow CPU computation).
 - A Gemini API Key from Google AI Studio
 - For temperature polling: AMD Ryzen CPU and AMD Ryzen Master Monitoring SDK installed on the host system
 
@@ -75,10 +78,28 @@ Unlike legacy assistant scripts that rely on hardcoded `if/else` intent routing 
 
 ### Configuration
 
-Create a `.env` file in the root directory of the project and insert your API key:
+**1. Create the Environment File:**
+Create a `.env` file in the root directory of the project and insert your API credentials:
+
 ```env
+# Google Gemini API
 GEMINI_API_KEY=your_actual_api_key_here
+
+# Spotify Developer API
+SPOTIPY_CLIENT_ID=your_spotify_client_id_here
+SPOTIPY_CLIENT_SECRET=your_spotify_client_secret_here
+SPOTIPY_REDIRECT_URI=http://127.0.0.1:8080(or any port which is not used by any other application)
 ```
+
+**2. Spotify OAuth Setup:**
+To get Kiko working with your personal Spotify account:
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and log in.
+2. Click **Create app**. Give it a name like "Kiko Assistant".
+3. In the App settings, find the **Redirect URIs** section.
+4. Add EXACTLY `http://127.0.0.1:8080` (Do *not* use `localhost`, it will fail).
+5. Copy your **Client ID** and **Client Secret** from the dashboard and paste them into your `.env` file.
+
+*(Note: The Spotify Redirect URI must strictly use the loopback IP `127.0.0.1` and exactly match the URI registered in your Spotify Developer Dashboard. Using the string `localhost` will be rejected by Spotify's OAuth flow).*
 
 ### Execution
 
