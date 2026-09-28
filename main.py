@@ -181,29 +181,24 @@ def main():
     
     def send_with_fallback(prompt_text):
         global chat, model_name, current_model_index
-        success = False
-        resp = None
-        for i in range(current_model_index, len(model_fallback_chain)):
+        import time
+        while True:
             try:
-                if i != current_model_index:
-                    print(f"   [⚠️ {model_name} failed (High Demand). Falling back to {model_fallback_chain[i]}...]")
-                    current_model_index = i
-                    model_name = model_fallback_chain[current_model_index]
-                    chat = client.chats.create(model=model_name, config=config)
-                
                 resp = chat.send_message(prompt_text)
-                success = True
-                break
+                return resp
             except Exception as e:
                 err_str = str(e).lower()
                 if "503" in err_str or "demand" in err_str or "not found" in err_str:
+                    next_index = (current_model_index + 1) % len(model_fallback_chain)
+                    next_model = model_fallback_chain[next_index]
+                    print(f"   [⚠️ {model_name} failed (High Demand). Falling back to {next_model}...]")
+                    current_model_index = next_index
+                    model_name = next_model
+                    chat = client.chats.create(model=model_name, config=config)
+                    time.sleep(2)
                     continue
                 else:
                     raise e
-                    
-        if not success:
-            raise Exception("All models in the fallback chain are experiencing high demand.")
-        return resp
 
     # Initialize the session context
     try:
