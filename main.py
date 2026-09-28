@@ -146,7 +146,7 @@ def thermal_monitor_thread():
         time.sleep(2)
 
 def main():
-    global chat
+    global chat, config
     # boot the c++ hardware monitoring daemon silently in the background before aiko wakes up
     import subprocess
     
