@@ -244,3 +244,81 @@ def spotify_get_user_stats(stat_type: str = "tracks", time_range: str = "short_t
         return f"Spotify API Error: {str(e)}"
     except Exception as e:
         return f"System Error: {str(e)}"
+
+def spotify_get_playlist_tracks(playlist_name: str, limit: int = 50) -> str:
+    """
+    Finds a playlist in the user's library by name and returns its tracks.
+    """
+    print(f"   [🎵 Kiko is fetching tracks for playlist '{playlist_name}'...]")
+    try:
+        sp = get_spotify_client()
+        playlists = sp.current_user_playlists(limit=50)
+        
+        target_playlist = None
+        for p in playlists.get('items', []):
+            if playlist_name.lower() in p['name'].lower():
+                target_playlist = p
+                break
+                
+        if not target_playlist:
+            return f"Could not find a playlist named '{playlist_name}' in your library."
+            
+        results = sp.playlist_tracks(target_playlist['id'], limit=limit)
+        items = results.get('items', [])
+        
+        if not items:
+            return f"The playlist '{target_playlist['name']}' is empty."
+            
+        output = [f"Tracks in '{target_playlist['name']}':"]
+        for idx, item in enumerate(items):
+            track = item.get('track') or item.get('item')
+            if track:
+                output.append(f"{idx + 1}. {track['name']} by {track['artists'][0]['name']}")
+                
+        total_tracks = results.get('total', 0)
+        if total_tracks > limit:
+            output.append(f"... and {total_tracks - limit} more tracks.")
+            
+        return "\n".join(output)
+    except spotipy.exceptions.SpotifyException as e:
+        return f"Spotify API Error: {str(e)}"
+    except Exception as e:
+        return f"System Error: {str(e)}"
+
+def spotify_add_track_to_playlist(playlist_name: str, track_query: str) -> str:
+    """
+    Searches for a track and adds it to an existing playlist by name.
+    """
+    print(f"   [🎵 Kiko is adding '{track_query}' to playlist '{playlist_name}'...]")
+    try:
+        sp = get_spotify_client()
+        
+        # 1. Search for the track
+        results = sp.search(q=track_query, type="track", limit=1)
+        items = results.get("tracks", {}).get("items", [])
+        if not items:
+            return f"Could not find any track matching '{track_query}' on Spotify."
+            
+        track_uri = items[0]['uri']
+        track_name = items[0]['name']
+        artist_name = items[0]['artists'][0]['name']
+        
+        # 2. Find the playlist
+        playlists = sp.current_user_playlists(limit=50)
+        target_playlist = None
+        for p in playlists.get('items', []):
+            if playlist_name.lower() in p['name'].lower():
+                target_playlist = p
+                break
+                
+        if not target_playlist:
+            return f"Could not find a playlist named '{playlist_name}' in your library."
+            
+        # 3. Add track to playlist
+        sp.playlist_add_items(playlist_id=target_playlist['id'], items=[track_uri])
+        
+        return f"Successfully added '{track_name} by {artist_name}' to your playlist '{target_playlist['name']}'!"
+    except spotipy.exceptions.SpotifyException as e:
+        return f"Spotify API Error: {str(e)}"
+    except Exception as e:
+        return f"System Error: {str(e)}"
