@@ -21,21 +21,36 @@ def get_location() -> dict:
         return {"error": "CRITICAL SYSTEM ERROR: WINDOWS LOCATION PERMISSION IS CURRENTLY DENIED. DO NOT GUESS THE WEATHER. YOU MUST ASK THE USER FOR PERMISSION TO TURN ON LOCATION, OR ASK FOR A CITY NAME."}
         
     try:
-        # User-Agent is explicitly required by ip-api to avoid blocks
+        # Primary: ip-api
         req = urllib.request.Request("http://ip-api.com/json/", headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=3) as response:
             data = json.loads(response.read().decode())
             if "city" in data and "lat" in data and "lon" in data:
-                return {
-                    "city": data["city"],
-                    "lat": data["lat"],
-                    "lon": data["lon"]
-                }
-            else:
-                return {"error": "Could not determine exact location coordinates from IP."}
+                return {"city": data["city"], "lat": data["lat"], "lon": data["lon"]}
+    except Exception:
+        pass
+        
+    try:
+        # Fallback 1: ipapi.co
+        req = urllib.request.Request("https://ipapi.co/json/", headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=3) as response:
+            data = json.loads(response.read().decode())
+            if "city" in data and "latitude" in data and "longitude" in data:
+                return {"city": data["city"], "lat": data["latitude"], "lon": data["longitude"]}
+    except Exception:
+        pass
+        
+    try:
+        # Fallback 2: ipinfo.io
+        req = urllib.request.Request("https://ipinfo.io/json", headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=3) as response:
+            data = json.loads(response.read().decode())
+            if "city" in data and "loc" in data:
+                lat, lon = data["loc"].split(',')
+                return {"city": data["city"], "lat": float(lat), "lon": float(lon)}
     except Exception as e:
         # Avoid hardcoding fallbacks. Pass the failure forward.
-        return {"error": f"IP Geolocation failed: {str(e)}"}
+        return {"error": f"IP Geolocation failed across all fallback endpoints: {str(e)}"}
 
 def _build_weather_url(endpoint: str, city_name: str = None) -> tuple:
     """Helper to construct the OWM API URL based on city name or native coordinates."""
