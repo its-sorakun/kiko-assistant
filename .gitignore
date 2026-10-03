@@ -38,3 +38,4 @@ dxgi_capture_backup.cpp
 
 # Virtual Environments
 venv/
+.kiko_port
