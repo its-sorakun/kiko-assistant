@@ -145,6 +145,71 @@ def thermal_monitor_thread():
         
         time.sleep(2)
 
+def terminal_interceptor_thread():
+    # Buffer UDP packets to stitch fragmented PowerShell STDERR streams together.
+    # PowerShell flushes STDERR in chunks; waiting 50ms ensures the complete error is captured before calling the API.
+    # By using a separate one-shot generation instead of the global chat object,
+    # temporary terminal typos do not pollute the primary conversational context window.
+    import socket
+    import select
+    import time
+    import os
+    
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    
+    port = 5555
+    while True:
+        try:
+            sock.bind(("127.0.0.1", port))
+            break
+        except OSError:
+            port += 1
+            
+    # Write the actively bound port to a file so the C++ wrapper can dynamically locate Kiko's socket
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    port_file = os.path.join(base_dir, ".kiko_port")
+    with open(port_file, "w") as f:
+        f.write(str(port))
+        
+    sock.setblocking(False)
+    
+    while True:
+        try:
+            ready = select.select([sock], [], [], None)
+            if not ready[0]:
+                continue
+                
+            data, addr = sock.recvfrom(4096)
+            error_msg = data.decode('utf-8', errors='ignore').strip()
+            
+            time.sleep(0.05)
+            while True:
+                ready = select.select([sock], [], [], 0.0)
+                if ready[0]:
+                    chunk, _ = sock.recvfrom(4096)
+                    error_msg += " " + chunk.decode('utf-8', errors='ignore').strip()
+                else:
+                    break
+            
+            if error_msg:
+                print(f"\n   [⚡ Kiko intercepted a terminal error! Analyzing...]")
+                
+                global client, model_name, config
+                prompt = f"I just typed a bad command in my terminal and got this error:\n{error_msg}\nGive me a quick 1-sentence hint on how to fix it!"
+                
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=config
+                )
+                
+                if response.text:
+                    # Send the response back to the C++ shell's ephemeral port
+                    sock.sendto(response.text.encode('utf-8'), addr)
+                    
+        except Exception as e:
+            print(f"\n[Kiko Terminal Watcher Exception]: {e}")
+
 def main():
     global chat, config
     # boot the c++ hardware monitoring daemon silently in the background before aiko wakes up
@@ -171,6 +236,9 @@ def main():
     import threading
     monitor = threading.Thread(target=thermal_monitor_thread, daemon=True)
     monitor.start()
+
+    terminal_watcher = threading.Thread(target=terminal_interceptor_thread, daemon=True)
+    terminal_watcher.start()
 
     print("--- Kiko is waking up! ---")
     print("(Type 'exit' or 'quit' to terminate)")
