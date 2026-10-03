@@ -204,6 +204,8 @@ def terminal_interceptor_thread():
                 )
                 
                 if response.text:
+                    # Print locally so Kiko's terminal updates too
+                    print(f"\nKiko (Terminal Watcher): {response.text}\n> ", end="", flush=True)
                     # Send the response back to the C++ shell's ephemeral port
                     sock.sendto(response.text.encode('utf-8'), addr)
                     
