@@ -193,3 +193,19 @@ While WinRT natively handles generic transport controls (play/pause/skip) locall
 - **Spotify Web API Integration**: Kiko integrates `spotipy` to communicate with the official Spotify Web API to handle advanced library management.
 - **Cache Redirection**: To prevent subprocess CWD pollution from spawning orphaned `.cache` files or throwing `SpotifyOauthError` exceptions when Kiko natively launches `main.py` from different shell contexts, the OAuth token `.cache` is strictly hardcoded to an absolute path utilizing `os.path.abspath(__file__)`.
 - **Intelligent Architectural Fallback**: Kiko is instructed to use the Web API exclusively for data retrieval and complex queueing. However, for basic playback controls, she bypasses the Web API entirely and falls back to her native WinRT hooks (Section 3). This architectural decision completely eliminates API rate limits and web-latency for simple pause/skip commands, keeping the assistant blazingly fast.
+
+## 21. Sinkhole-Resilient IP Geolocation
+**File:** `tools/weather.py` -> `get_location()`
+
+When Kiko needs to infer the physical location of the host machine for environmental queries (like weather), relying on a single IP-to-Location API is mechanically fragile. Power-users frequently route traffic through aggressive DNS sinkholes (Pi-hole, NextDNS, AdGuard Home) that outright blackhole domains associated with telemetry, such as `ip-api.com`, throwing fatal `getaddrinfo` resolution errors.
+- **Cascade Fallback Architecture**: To ensure Kiko survives network-level blocks, the geolocation module implements an aggressive, multi-layered fallback cascade.
+- **Endpoint Rotation**: The system natively initiates a 3000ms-timeout request to the primary unauthenticated tracker (`ip-api.com`). If the DNS fails or the socket resets, the Python runtime quietly catches the exception and immediately rotates through secondary and tertiary endpoints (`ipapi.co`, then `ipinfo.io`). 
+- **Dynamic JSON Parsing**: Because each provider architects their JSON payloads differently (e.g., `lat`/`lon` floats versus a singular `loc` string requiring runtime splitting), the parser mechanically adapts to the specific payload format of whichever API survives the sinkhole, ensuring Kiko always gets her coordinates without bothering the user.
+
+## 22. Bi-Directional UDP Terminal Interceptor
+**Files:** `tools/kiko_shell/kiko_shell.cpp`, `main.py` -> `terminal_interceptor_thread()`
+
+To allow Kiko to actively observe and diagnose shell errors without requiring the user to manually copy-paste them, a custom Win32 C++ wrapper (`kiko_shell.exe`) hijacks the `STDERR` pipe of a spawned PowerShell process.
+- **Connectionless IPC**: Instead of blocking on a TCP handshake, the C++ wrapper blasts captured errors over UDP. This guarantees the terminal never hangs or crashes if Kiko's Python process is not running. 
+- **Dynamic Port Failover**: If Kiko fails to bind to port 5555 on startup (e.g., zombie process), she iterates to a free port and writes it to `.kiko_port`. The C++ wrapper natively `fopen`s this file immediately before calling `sendto`, allowing instantaneous adaptation to Kiko's port changes without requiring a shell restart.
+- **Two-Way Injection**: Kiko extracts the ephemeral UDP port from the incoming packet's `addr` block and fires her LLM-generated hint back to the exact socket. The C++ wrapper receives this payload on a detached `std::thread` and injects it directly into the user's `stdout` stream using ANSI color codes.
