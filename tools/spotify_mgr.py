@@ -106,7 +106,7 @@ def spotify_get_devices() -> str:
     except Exception as e:
         return f"System Error: {str(e)}"
 
-def spotify_create_and_fill_playlist(playlist_name: str, seed_genres: list) -> str:
+def spotify_create_and_fill_playlist(playlist_name: str, search_query: str) -> str:
     """
     Creates a new playlist and fills it with recommended tracks based on seed genres.
     """
@@ -115,12 +115,13 @@ def spotify_create_and_fill_playlist(playlist_name: str, seed_genres: list) -> s
         sp = get_spotify_client()
         user_id = sp.me()['id']
         
-        # 1. Get recommendations
-        recs = sp.recommendations(seed_genres=seed_genres, limit=20)
-        track_uris = [track['uri'] for track in recs['tracks']]
+        # 1. Search for tracks matching the query
+        recs = sp.search(q=search_query, type="track", limit=20)
+        tracks = recs.get("tracks", {}).get("items", [])
+        track_uris = [track['uri'] for track in tracks]
         
         if not track_uris:
-            return f"Could not generate recommendations for genres: {seed_genres}"
+            return f"Could not find any tracks matching the query: '{search_query}'"
             
         # 2. Create the playlist
         new_playlist = sp.user_playlist_create(user=user_id, name=playlist_name, public=False)
@@ -132,7 +133,7 @@ def spotify_create_and_fill_playlist(playlist_name: str, seed_genres: list) -> s
         # 4. Start playing it!
         sp.start_playback(context_uri=new_playlist['uri'])
         
-        return f"Successfully created playlist '{playlist_name}' with {len(track_uris)} tracks and started playback!"
+        return f"Successfully created playlist '{playlist_name}' with {len(track_uris)} tracks (searched for '{search_query}') and started playback!"
     except spotipy.exceptions.SpotifyException as e:
         return f"Spotify API Error: {str(e)}"
     except Exception as e:
