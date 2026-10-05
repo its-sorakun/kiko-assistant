@@ -106,27 +106,14 @@ def spotify_get_devices() -> str:
     except Exception as e:
         return f"System Error: {str(e)}"
 
-def spotify_fill_existing_playlist(playlist_name: str, track_queries: list) -> str:
+def spotify_create_and_fill_playlist(playlist_name: str, track_queries: list) -> str:
     """
-    Fills an ALREADY EXISTING playlist in the user's library with a specific list of curated tracks.
-    NOTE: Spotify API no longer allows third-party apps to CREATE new playlists. The user MUST create an empty playlist in their Spotify app first, then you can call this tool to fill it.
+    Creates a new playlist and fills it with a specific list of tracks curated by Kiko, then starts playing it.
     """
-    print(f"   [🎵 Kiko is filling your existing playlist '{playlist_name}'...]")
+    print(f"   [🎵 Kiko is creating playlist '{playlist_name}'...]")
     try:
         sp = get_spotify_client()
-        
-        # 1. Find the target playlist
-        playlists = sp.current_user_playlists(limit=50)
-        target_playlist = None
-        for p in playlists.get('items', []):
-            if playlist_name.lower() in p['name'].lower():
-                target_playlist = p
-                break
-                
-        if not target_playlist:
-            return f"Could not find a playlist named '{playlist_name}'. Tell the user to create it manually in Spotify first due to API restrictions, then you will fill it."
-        
-        # 1. Search for each track individually
+
         track_uris = []
         for query in track_queries:
             results = sp.search(q=query, type="track", limit=1)
@@ -134,19 +121,23 @@ def spotify_fill_existing_playlist(playlist_name: str, track_queries: list) -> s
             if items:
                 track_uris.append(items[0]['uri'])
 
-
-
-        
         if not track_uris:
-            return f"Could not find any of the requested tracks on Spotify."
-            
-        # 3. Add the tracks
-        sp.playlist_add_items(playlist_id=target_playlist['id'], items=track_uris)
-        
-        # 4. Start playing it!
-        sp.start_playback(context_uri=target_playlist['uri'])
-        
-        return f"Successfully added {len(track_uris)} tracks to your playlist '{target_playlist['name']}' and started playback!"
+            return "Could not find any of the requested tracks on Spotify."
+
+        # Feb 2026 dev-mode changes removed POST /users/{id}/playlists (what sp.user_playlist_create calls) and
+        # deprecated /playlists/{id}/tracks, which now answers 403. The replacements are /me/playlists and /items.
+        playlist = sp._post("me/playlists", payload={
+            "name": playlist_name,
+            "public": False,
+            "description": "Curated by Kiko",
+        })
+        # 100 URIs per request is the documented cap
+        for start in range(0, len(track_uris), 100):
+            sp._post(f"playlists/{playlist['id']}/items", payload={"uris": track_uris[start:start + 100]})
+
+        sp.start_playback(context_uri=playlist['uri'])
+
+        return f"Created playlist '{playlist_name}' with {len(track_uris)} tracks and started playback!"
     except spotipy.exceptions.SpotifyException as e:
         return f"Spotify API Error: {str(e)}"
     except Exception as e:
@@ -277,7 +268,7 @@ def spotify_get_playlist_tracks(playlist_name: str, limit: int = 50) -> str:
         if not target_playlist:
             return f"Could not find a playlist named '{playlist_name}' in your library."
             
-        results = sp.playlist_tracks(target_playlist['id'], limit=limit)
+        results = sp._get(f"playlists/{target_playlist['id']}/items", limit=limit)
         items = results.get('items', [])
         
         if not items:
@@ -329,7 +320,8 @@ def spotify_add_track_to_playlist(playlist_name: str, track_query: str) -> str:
             return f"Could not find a playlist named '{playlist_name}' in your library."
             
         # 3. Add track to playlist
-        sp.playlist_add_items(playlist_id=target_playlist['id'], items=[track_uri])
+        # /tracks is deprecated and returns 403 in dev mode, see spotify_create_and_fill_playlist
+        sp._post(f"playlists/{target_playlist['id']}/items", payload={"uris": [track_uri]})
         
         return f"Successfully added '{track_name} by {artist_name}' to your playlist '{target_playlist['name']}'!"
     except spotipy.exceptions.SpotifyException as e:
