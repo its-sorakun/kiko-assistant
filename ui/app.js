@@ -73,19 +73,50 @@ async function loadSessions() {
     }
 }
 
+const confirmModal = document.getElementById('confirm-modal');
+const modalConfirm = document.getElementById('modal-confirm');
+const modalCancel = document.getElementById('modal-cancel');
+const modalInner = confirmModal.querySelector('div');
+
+function showConfirmModal(onConfirm) {
+    confirmModal.classList.remove('hidden');
+    // small delay to allow display block to apply before animating opacity
+    setTimeout(() => {
+        confirmModal.classList.remove('opacity-0');
+        modalInner.classList.remove('scale-95');
+    }, 10);
+    
+    modalCancel.onclick = () => {
+        hideConfirmModal();
+    };
+    
+    modalConfirm.onclick = () => {
+        hideConfirmModal();
+        onConfirm();
+    };
+}
+
+function hideConfirmModal() {
+    confirmModal.classList.add('opacity-0');
+    modalInner.classList.add('scale-95');
+    setTimeout(() => {
+        confirmModal.classList.add('hidden');
+    }, 300);
+}
+
 async function deleteSession(id) {
-    if(!confirm("Erase this memory?")) return;
-    
-    await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
-    
-    if (currentSessionId === id) {
-        currentSessionId = null;
-        currentSessionTitle.innerText = "";
-        chatFeed.innerHTML = emptyStateHTML;
-        if (ws) ws.close();
-    }
-    
-    await loadSessions();
+    showConfirmModal(async () => {
+        await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+        
+        if (currentSessionId === id) {
+            currentSessionId = null;
+            currentSessionTitle.innerText = "";
+            chatFeed.innerHTML = emptyStateHTML;
+            if (ws) ws.close();
+        }
+        
+        await loadSessions();
+    });
 }
 
 async function createSession() {
