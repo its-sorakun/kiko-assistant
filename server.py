@@ -73,44 +73,165 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
             
             # Save user message to SQLite
             save_chat_message(session_id, "user", user_msg)
+
+            # Fetch past session history for Gemini context
+            past_messages = get_chat_messages(session_id)
+            history = []
+            from google.genai import types
+            for msg in past_messages:
+                # We skip the very last message since we just saved it and will pass it as the prompt
+                if msg == past_messages[-1]: continue
+                
+                if msg['role'] == 'tool_execution':
+                    continue
+                    
+                role = 'user' if msg['role'] == 'user' else 'model'
+                history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg['content'])]))
+
+            # Import Kiko's brain
+            import main
+            import datetime
             
-            # TODO: Integrate with Gemini / main Kiko logic here.
-            # For now, echo back to establish the architecture structure.
-            
-            # Example tool execution block (Transparency!)
+            # Send a "Thinking..." status
             await websocket.send_json({
-                "type": "tool_execution",
-                "tool": "mft_search",
+                "type": "status",
+                "message": "Kiko is thinking...",
                 "status": "running"
             })
             
-            time.sleep(1) # Simulate tool run
-            
-            await websocket.send_json({
-                "type": "tool_execution",
-                "tool": "mft_search",
-                "status": "completed",
-                "result": "Found 3 files."
-            })
-            
-            # Example text streaming
-            response_text = f"Senpai, you said: '{user_msg}'. I am currently running on the FastAPI backend! My Gemini core hasn't been connected to this websocket route yet, but my architecture is ready!"
-            
-            # Stream the response back token by token (simulation)
-            for word in response_text.split(" "):
+            try:
+                # Vector Search for semantic memory
+                embedding_response = main.client.models.embed_content(
+                    model='gemini-embedding-2',
+                    contents=user_msg
+                )
+                query_vector = embedding_response.embeddings[0].values
+                from tools.memory import recall_semantic_memory, save_vector_memory
+                memory_match = recall_semantic_memory(query_vector)
+
+                current_time = datetime.datetime.now().strftime("%A, %Y-%m-%d %H:%M:%S")
+                time_context = f"[Current System Time: {current_time}]\n"
+                
+                augmented_prompt = f"{time_context}{user_msg}"
+                if memory_match:
+                    augmented_prompt = f"{time_context}Context from past conversation:\n{memory_match}\n\nUser: {user_msg}"
+
+                import asyncio
+                
+                full_response_text = ""
+                
+                while True:
+                    try:
+                        # Create async chat session with history
+                        chat = main.client.aio.chats.create(model=main.model_name, config=main.config, history=history)
+                        
+                        # Stream the response
+                        response_stream = await chat.send_message_stream(augmented_prompt)
+                        
+                        iterator = response_stream.__aiter__()
+                        first_chunk = await iterator.__anext__()
+                        
+                        # Clear the loader now that we successfully got the first token
+                        await websocket.send_json({
+                            "type": "status",
+                            "message": "Kiko is thinking...",
+                            "status": "completed"
+                        })
+                        
+                        if getattr(first_chunk, 'function_calls', None):
+                            for fc in getattr(first_chunk, 'function_calls', []):
+                                save_chat_message(session_id, "tool_execution", fc.name)
+                                await websocket.send_json({
+                                    "type": "tool_execution",
+                                    "tool": fc.name,
+                                    "status": "running"
+                                })
+                                
+                        if getattr(first_chunk, 'text', None):
+                            await websocket.send_json({"type": "tool_execution", "status": "completed"})
+                            full_response_text += getattr(first_chunk, 'text')
+                            await websocket.send_json({"type": "token", "content": getattr(first_chunk, 'text')})
+                            
+                        async for chunk in iterator:
+                            if getattr(chunk, 'function_calls', None):
+                                for fc in getattr(chunk, 'function_calls', []):
+                                    save_chat_message(session_id, "tool_execution", fc.name)
+                                    await websocket.send_json({
+                                        "type": "tool_execution",
+                                        "tool": fc.name,
+                                        "status": "running"
+                                    })
+                                    
+                            if getattr(chunk, 'text', None):
+                                await websocket.send_json({"type": "tool_execution", "status": "completed"})
+                                full_response_text += getattr(chunk, 'text')
+                                await websocket.send_json({"type": "token", "content": getattr(chunk, 'text')})
+                                
+                        break # exit the fallback loop if successful
+                        
+                    except StopAsyncIteration:
+                        # Empty response but successful request
+                        await websocket.send_json({
+                            "type": "status",
+                            "message": "Kiko is thinking...",
+                            "status": "completed"
+                        })
+                        break
+                    except Exception as e:
+                        err_str = str(e).lower()
+                        if "503" in err_str or "demand" in err_str or "not found" in err_str or "quota" in err_str:
+                            next_index = (main.current_model_index + 1) % len(main.model_fallback_chain)
+                            next_model = main.model_fallback_chain[next_index]
+                            
+                            print(f"   [⚠️ {main.model_name} failed (High Demand). Falling back to {next_model}...] (Web UI)")
+                            
+                            main.current_model_index = next_index
+                            main.model_name = next_model
+                            
+                            # Clear current thinking/fallback status
+                            await websocket.send_json({
+                                "type": "status",
+                                "message": "",
+                                "status": "completed"
+                            })
+                            
+                            # Notify UI of fallback
+                            await websocket.send_json({
+                                "type": "status",
+                                "message": f"⚠️ High demand! Switching to {next_model}...",
+                                "status": "running"
+                            })
+                            
+                            await asyncio.sleep(2)
+                            # Will loop back up and retry with the new model_name
+                            
+                        else:
+                            raise e
+
+                # Signal completion
+                await websocket.send_json({
+                    "type": "done"
+                })
+                
+                # Save Kiko's final message to SQLite
+                save_chat_message(session_id, "assistant", full_response_text)
+                
+                # Embed and save the interaction memory
+                interaction_log = f"User: {user_msg}\nKiko: {full_response_text}"
+                save_resp = main.client.models.embed_content(
+                    model='gemini-embedding-2',
+                    contents=interaction_log
+                )
+                save_vector_memory(interaction_log, save_resp.embeddings[0].values)
+
+            except Exception as e:
+                error_msg = f"Kiko encountered an error: {e}"
                 await websocket.send_json({
                     "type": "token",
-                    "content": word + " "
+                    "content": error_msg
                 })
-                time.sleep(0.05)
-                
-            # Signal completion
-            await websocket.send_json({
-                "type": "done"
-            })
-            
-            # Save Kiko's final message to SQLite
-            save_chat_message(session_id, "assistant", response_text)
+                await websocket.send_json({"type": "done"})
+                save_chat_message(session_id, "assistant", error_msg)
 
     except WebSocketDisconnect:
         print(f"Client disconnected from session {session_id}")
