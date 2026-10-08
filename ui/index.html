@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kiko OS Assistant</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -92,6 +93,52 @@
 
         .dark {
             --dot-color: #332E2E;
+        }
+
+        /* Override Tailwind Typography CSS Variables */
+        .prose {
+            --tw-prose-body: #4A443C !important;
+            --tw-prose-headings: #4A443C !important;
+            --tw-prose-lead: #4A443C !important;
+            --tw-prose-links: #8CA18B !important;
+            --tw-prose-bold: #4A443C !important;
+            --tw-prose-counters: #9CA3AF !important;
+            --tw-prose-bullets: #9CA3AF !important;
+            --tw-prose-hr: #E8E4DB !important;
+            --tw-prose-quotes: #4A443C !important;
+            --tw-prose-quote-borders: #8CA18B !important;
+            --tw-prose-captions: #9CA3AF !important;
+            --tw-prose-code: #4A443C !important;
+            --tw-prose-pre-code: #E8E4DB !important;
+            --tw-prose-pre-bg: #2A2626 !important;
+            --tw-prose-th-borders: #E8E4DB !important;
+            --tw-prose-td-borders: #E8E4DB !important;
+            color: var(--tw-prose-body) !important;
+        }
+
+        .dark .prose, .prose.dark\:prose-invert {
+            --tw-prose-body: #E6E2D8 !important;
+            --tw-prose-headings: #E6E2D8 !important;
+            --tw-prose-lead: #E6E2D8 !important;
+            --tw-prose-links: #C48B81 !important;
+            --tw-prose-bold: #E6E2D8 !important;
+            --tw-prose-counters: #9CA3AF !important;
+            --tw-prose-bullets: #9CA3AF !important;
+            --tw-prose-hr: #3D3737 !important;
+            --tw-prose-quotes: #E6E2D8 !important;
+            --tw-prose-quote-borders: #C48B81 !important;
+            --tw-prose-captions: #9CA3AF !important;
+            --tw-prose-code: #E6E2D8 !important;
+            --tw-prose-pre-code: #E6E2D8 !important;
+            --tw-prose-pre-bg: #231F1F !important;
+            --tw-prose-th-borders: #3D3737 !important;
+            --tw-prose-td-borders: #3D3737 !important;
+            color: var(--tw-prose-body) !important;
+        }
+
+        .prose p {
+            margin-top: 0.5em !important;
+            margin-bottom: 0.5em !important;
         }
 
         /* Wavy Border using SVG data URI */
