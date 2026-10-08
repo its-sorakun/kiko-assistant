@@ -97,3 +97,38 @@ def analyze_screen(prompt: str) -> str:
         
     except Exception as e:
         return f"Error analyzing screen: {str(e)}"
+
+def analyze_image(image_path: str, prompt: str) -> str:
+    """
+    Analyzes an image file on disk and passes it to a vision LLM alongside your prompt.
+    Use this when the user explicitly uploads or attaches an image in the chat interface.
+    """
+    try:
+        if not os.path.exists(image_path):
+            return f"Error: Image file not found at {image_path}"
+            
+        img = Image.open(image_path)
+        
+        fallback_chain = ['gemini-3.5-flash-lite','gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-pro', 'gemini-3.1-flash-lite']
+        response = None
+        
+        for m in fallback_chain:
+            try:
+                chat = client.chats.create(model=m)
+                response = chat.send_message([prompt, img])
+                break # Success
+            except Exception as e:
+                err_str = str(e).lower()
+                if "503" in err_str or "demand" in err_str or "not found" in err_str:
+                    print(f"   [⚠️ {m} failed (High Demand/Unavailable) in analyze_image. Falling back...]")
+                    continue
+                else:
+                    return f"Error analyzing image: {str(e)}"
+                    
+        if not response:
+            return "Error: All models in the fallback chain are experiencing high demand or are unavailable."
+            
+        return f"Image Analysis Result:\n{response.text}"
+        
+    except Exception as e:
+        return f"Error analyzing image: {str(e)}"
