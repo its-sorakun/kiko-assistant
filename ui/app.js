@@ -491,20 +491,31 @@ function appendToolExecution(toolData, args) {
     const block = document.createElement('div');
     block.className = 'flex items-center gap-2 bg-white/70 dark:bg-cozy-darkBubble/70 backdrop-blur-sm border border-dashed border-cozy-border dark:border-cozy-darkBorder rounded-[16px] px-4 py-2 font-mono text-[12.5px] text-cozy-muted w-fit shadow-sm';
     
-    let displayString = `Looking at <span class="font-semibold text-cozy-text dark:text-cozy-darkText">${toolName}</span>`;
+    let displayString = `[⚡ Kiko is looking at <span class="font-semibold text-cozy-text dark:text-cozy-darkText">${toolName}</span>...]`;
     
     if (toolName === 'perform_web_search' && toolArgs.query) {
-        displayString = `Performing web search for <span class="font-semibold text-cozy-text dark:text-cozy-darkText">"${toolArgs.query}"</span>`;
+        displayString = `[🌐 Kiko is performing a web search for: '<span class="font-semibold text-cozy-text dark:text-cozy-darkText">${toolArgs.query}</span>'...]`;
     } else if (toolName === 'get_current_weather' && toolArgs.city_name) {
-        displayString = `Checking the weather in <span class="font-semibold text-cozy-text dark:text-cozy-darkText">${toolArgs.city_name}</span>`;
-    } else if (toolName === 'spotify_search_and_play' && toolArgs.query) {
-        displayString = `Playing <span class="font-semibold text-cozy-text dark:text-cozy-darkText">"${toolArgs.query}"</span> on Spotify`;
+        displayString = `[☁️ Kiko is looking into the current weather for <span class="font-semibold text-cozy-text dark:text-cozy-darkText">${toolArgs.city_name}</span>...]`;
+    } else if (toolName.startsWith('spotify_')) {
+        let q = toolArgs.query || toolArgs.playlist_name || toolArgs.track_query || "";
+        displayString = `[🎵 Kiko is interacting with Spotify${q ? ` for '<span class="font-semibold text-cozy-text dark:text-cozy-darkText">${q}</span>'` : ''}...]`;
+    } else if (toolName === 'perform_global_search' && toolArgs.filename) {
+        displayString = `[⚡ Kiko is scanning the Master File Table for: '<span class="font-semibold text-cozy-text dark:text-cozy-darkText">${toolArgs.filename}</span>'...]`;
+    } else if (toolName === 'advanced_pdf_query' && toolArgs.file_path) {
+        let basename = toolArgs.file_path.split(/[\\/]/).pop();
+        displayString = `[⚡ Kiko is reading and chunking the PDF: '<span class="font-semibold text-cozy-text dark:text-cozy-darkText">${basename}</span>'...]`;
+    } else if (toolName === 'analyze_screen' || toolName === 'analyze_image') {
+        displayString = `[👀 Kiko is trying to look at the screen/image natively...]`;
+    } else if (toolName === 'read_active_window_content') {
+        displayString = `[⚡ Kiko is hooking into native UIAutomation/Memory...]`;
+    } else if (toolName === 'clear_short_term_memory') {
+        displayString = `[🧠 Kiko is wiping her short term memory...]`;
     }
 
     block.innerHTML = `
-        <span>✐</span>
         <span>${displayString}</span>
-        <span class="tool-status ml-1 text-cozy-muted">...</span>
+        <span class="tool-status ml-1 text-cozy-muted"></span>
     `;
 
     wrapper.appendChild(block);
