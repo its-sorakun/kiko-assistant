@@ -140,10 +140,13 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                         
                         if getattr(first_chunk, 'function_calls', None):
                             for fc in getattr(first_chunk, 'function_calls', []):
-                                save_chat_message(session_id, "tool_execution", fc.name)
+                                import json
+                                args_dict = dict(fc.args) if fc.args else {}
+                                save_chat_message(session_id, "tool_execution", json.dumps({"name": fc.name, "args": args_dict}))
                                 await websocket.send_json({
                                     "type": "tool_execution",
                                     "tool": fc.name,
+                                    "args": args_dict,
                                     "status": "running"
                                 })
                                 
@@ -155,10 +158,13 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                         async for chunk in iterator:
                             if getattr(chunk, 'function_calls', None):
                                 for fc in getattr(chunk, 'function_calls', []):
-                                    save_chat_message(session_id, "tool_execution", fc.name)
+                                    import json
+                                    args_dict = dict(fc.args) if fc.args else {}
+                                    save_chat_message(session_id, "tool_execution", json.dumps({"name": fc.name, "args": args_dict}))
                                     await websocket.send_json({
                                         "type": "tool_execution",
                                         "tool": fc.name,
+                                        "args": args_dict,
                                         "status": "running"
                                     })
                                     
