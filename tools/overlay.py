@@ -57,8 +57,12 @@ def main():
         temp = "XX.X"
     else:
         temp = sys.argv[1]
+        
+    component = "CPU"
+    if len(sys.argv) >= 3:
+        component = sys.argv[2]
 
-    text = f"[ KIKO'S WARNING ] CPU THERMAL THRESHOLD EXCEEDED ({temp}°C)"
+    text = f"[ KIKO'S WARNING ] {component} THERMAL THRESHOLD EXCEEDED ({temp}°C)"
     
     # The Window Procedure to intercept hardware paint signals
     def wndproc(hwnd, msg, wparam, lparam):

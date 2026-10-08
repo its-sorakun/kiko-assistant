@@ -114,31 +114,58 @@ def thermal_monitor_thread():
     import os
 
     # State tracking to alert exactly when it crosses the threshold (edge-trigger)
-    is_overheating = False
-    warning_threshold = 89.0
-    reset_threshold = warning_threshold - 2.0  # Hysteresis: must drop 2 degrees below to reset
+    cpu_is_overheating = False
+    cpu_warning_threshold = 89.0
+    cpu_reset_threshold = cpu_warning_threshold - 2.0  # Hysteresis: must drop 2 degrees below to reset
     
-    overlay_process = None
+    gpu_is_overheating = False
+    gpu_warning_threshold = 84.0
+    gpu_reset_threshold = gpu_warning_threshold - 2.0
+    
+    cpu_overlay_process = None
+    gpu_overlay_process = None
     overlay_script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools", "overlay.py")
 
     while True:
         try:
             shmem = mmap.mmap(-1, 8, tagname="Kiko_CPU_Temp", access=mmap.ACCESS_READ)
             raw_bytes = shmem.read(8)
-            celsius = struct.unpack('d', raw_bytes)[0]
+            cpu_celsius = struct.unpack('d', raw_bytes)[0]
             shmem.close()
 
             # Trigger alert if it crosses the threshold that aren't already in an overheated state
-            if celsius >= warning_threshold and not is_overheating:
-                overlay_process = subprocess.Popen([sys.executable, overlay_script, f"{celsius:.1f}"])
-                is_overheating = True
+            if cpu_celsius >= cpu_warning_threshold and not cpu_is_overheating:
+                cpu_overlay_process = subprocess.Popen([sys.executable, overlay_script, f"{cpu_celsius:.1f}", "CPU"])
+                cpu_is_overheating = True
                 
             # Only reset the state if the temp drops sufficiently below the threshold (prevent micro-bouncing spam)
-            elif celsius < reset_threshold and is_overheating:
-                if overlay_process:
-                    overlay_process.terminate()
-                    overlay_process = None
-                is_overheating = False
+            elif cpu_celsius < cpu_reset_threshold and cpu_is_overheating:
+                if cpu_overlay_process:
+                    cpu_overlay_process.terminate()
+                    cpu_overlay_process = None
+                cpu_is_overheating = False
+                
+        except Exception:
+            pass
+            
+        try:
+            # Extract GPU Temp natively via nvidia-smi
+            # CREATE_NO_WINDOW (0x08000000) prevents the console window from briefly flashing
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader"],
+                capture_output=True, text=True, check=True, creationflags=0x08000000
+            )
+            gpu_celsius = float(result.stdout.strip())
+            
+            if gpu_celsius >= gpu_warning_threshold and not gpu_is_overheating:
+                gpu_overlay_process = subprocess.Popen([sys.executable, overlay_script, f"{gpu_celsius:.1f}", "GPU"])
+                gpu_is_overheating = True
+                
+            elif gpu_celsius < gpu_reset_threshold and gpu_is_overheating:
+                if gpu_overlay_process:
+                    gpu_overlay_process.terminate()
+                    gpu_overlay_process = None
+                gpu_is_overheating = False
                 
         except Exception:
             pass
