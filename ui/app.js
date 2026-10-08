@@ -338,16 +338,34 @@ function updateEmpathyEngine(wrapper, text) {
     const avatar = wrapper.querySelector('.kiko-avatar');
     if (!icon || !avatar) return;
 
-    if (text.includes('(>_<)') || text.includes('⚠️') || text.includes('error')) {
+    let extractedKaomoji = null;
+    const matches = text.match(/\(([^)]{2,12})\)/g);
+    if (matches) {
+        for (let m of matches) {
+            let inside = m.slice(1, -1);
+            // If it doesn't contain a real word, assume it's a kaomoji
+            if (!/[a-zA-Z]{3,}/.test(inside)) {
+                extractedKaomoji = inside;
+                break;
+            }
+        }
+    }
+
+    if (extractedKaomoji) {
+        icon.innerText = extractedKaomoji;
+        icon.className = 'avatar-icon text-[12px] font-bold tracking-tighter';
+        if (extractedKaomoji.includes('>') && extractedKaomoji.includes('<') && !extractedKaomoji.includes('๑')) {
+            avatar.classList.remove('bg-cozy-accent');
+            avatar.classList.add('bg-cozy-terracotta');
+        } else {
+            avatar.classList.remove('bg-cozy-terracotta');
+            avatar.classList.add('bg-cozy-accent');
+        }
+    } else if (text.includes('⚠️') || text.includes('error')) {
         icon.innerText = '>_<';
         icon.className = 'avatar-icon text-[12px] font-bold tracking-tighter';
         avatar.classList.remove('bg-cozy-accent');
         avatar.classList.add('bg-cozy-terracotta');
-    } else if (text.includes('(๑>ᴗ<๑)') || text.includes('Yay') || text.includes('hihi') || text.includes('❤️') || text.includes('✨')) {
-        icon.innerText = '^‿^';
-        icon.className = 'avatar-icon text-[14px] font-bold tracking-tighter';
-        avatar.classList.remove('bg-cozy-terracotta');
-        avatar.classList.add('bg-cozy-accent');
     } else if (text.includes('?')) {
         icon.innerText = 'O_o';
         icon.className = 'avatar-icon text-[12px] font-bold tracking-tighter';
