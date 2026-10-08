@@ -62,6 +62,29 @@ async def delete_session(session_id: int):
     delete_chat_session(session_id)
     return {"status": "success"}
 
+from fastapi import UploadFile, File
+import shutil
+import uuid
+
+@app.post("/api/upload")
+async def upload_image(file: UploadFile = File(...)):
+    """Upload an image to the scratch directory for analysis."""
+    scratch_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scratch")
+    if not os.path.exists(scratch_dir):
+        os.makedirs(scratch_dir)
+        
+    ext = os.path.splitext(file.filename)[1]
+    if not ext:
+        ext = ".png"
+    filename = f"upload_{uuid.uuid4().hex}{ext}"
+    filepath = os.path.join(scratch_dir, filename)
+    
+    with open(filepath, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # Return the absolute path so Kiko can read it
+    return {"path": filepath}
+
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
     await websocket.accept()
