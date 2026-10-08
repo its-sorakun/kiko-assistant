@@ -26,6 +26,7 @@ from .spotify_mgr import (
     spotify_get_queue, spotify_get_user_playlists, spotify_play_user_playlist, spotify_get_user_stats,
     spotify_get_playlist_tracks, spotify_add_track_to_playlist
 )
+from .notes import get_notes, create_note, update_note, delete_note
 
 __all__ = [
     "launch_program", 
@@ -66,5 +67,9 @@ __all__ = [
     "spotify_play_user_playlist",
     "spotify_get_user_stats",
     "spotify_get_playlist_tracks",
-    "spotify_add_track_to_playlist"
+    "spotify_add_track_to_playlist",
+    "get_notes",
+    "create_note",
+    "update_note",
+    "delete_note"
 ]
