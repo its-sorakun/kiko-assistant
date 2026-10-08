@@ -164,7 +164,7 @@ async function loadChat(sessionId, title) {
             } else {
                 appendMessage(msg.role, msg.content);
                 const block = chatFeed.lastElementChild;
-                if (msg.role === 'assistant') parseWidgets(block);
+                if (msg.role === 'assistant') parseWidgetsAndMarkdown(block);
             }
         });
         scrollToBottom();
@@ -179,39 +179,42 @@ function connectWebSocket(sessionId) {
 
     let currentBotMessageDiv = null;
     let toolBlockDiv = null;
+    let statusBlockDiv = null;
 
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
 
         if (data.type === 'tool_execution') {
             if (data.status === 'running') {
-                toolBlockDiv = appendToolExecution(data.tool);
+                toolBlockDiv = appendToolExecution(data.tool, data.args);
             } else if (data.status === 'completed' && toolBlockDiv) {
                 const statusSpan = toolBlockDiv.querySelector('.tool-status');
                 statusSpan.innerHTML = 'done <span class="text-[14px]">✦</span>';
                 statusSpan.classList.replace('text-cozy-muted', 'text-cozy-terracotta');
+                toolBlockDiv = null; // Clear it so it doesn't get messed up later
             }
             scrollToBottom();
         } else if (data.type === 'status') {
             if (data.status === 'running') {
-                toolBlockDiv = appendStatusMessage(data.message);
-            } else if (data.status === 'completed' && toolBlockDiv) {
-                toolBlockDiv.parentElement.remove();
-                toolBlockDiv = null;
+                statusBlockDiv = appendStatusMessage(data.message);
+            } else if (data.status === 'completed' && statusBlockDiv) {
+                statusBlockDiv.parentElement.remove();
+                statusBlockDiv = null;
             }
             scrollToBottom();
         } else if (data.type === 'token') {
             if (!currentBotMessageDiv) {
                 currentBotMessageDiv = createMessageDiv('assistant');
+                currentBotMessageDiv.dataset.rawText = '';
                 chatFeed.appendChild(currentBotMessageDiv);
             }
-            currentBotMessageDiv.querySelector('.prose').innerHTML += data.content;
-            updateEmpathyEngine(currentBotMessageDiv, currentBotMessageDiv.querySelector('.prose').innerText);
+            currentBotMessageDiv.dataset.rawText += data.content;
+            
+            updateEmpathyEngine(currentBotMessageDiv, currentBotMessageDiv.dataset.rawText);
+            parseWidgetsAndMarkdown(currentBotMessageDiv);
+            
             scrollToBottom();
         } else if (data.type === 'done') {
-            if (currentBotMessageDiv) {
-                parseWidgets(currentBotMessageDiv);
-            }
             currentBotMessageDiv = null;
             setInputState(false);
         }
@@ -240,7 +243,7 @@ function createMessageDiv(role) {
     }
 
     const content = document.createElement('div');
-    content.className = 'prose whitespace-pre-wrap flex-1 pt-1';
+    content.className = 'prose flex-1 pt-1';
     bubble.appendChild(content);
 
     wrapper.appendChild(bubble);
@@ -252,9 +255,13 @@ function appendMessage(role, text) {
     if (emptyState) emptyState.remove();
 
     const wrapper = createMessageDiv(role);
-    wrapper.querySelector('.prose').innerText = text;
+    wrapper.dataset.rawText = text;
+    
     if (role === 'assistant') {
         updateEmpathyEngine(wrapper, text);
+        parseWidgetsAndMarkdown(wrapper);
+    } else {
+        wrapper.querySelector('.prose').innerText = text;
     }
     chatFeed.appendChild(wrapper);
 }
@@ -287,18 +294,16 @@ function updateEmpathyEngine(wrapper, text) {
     }
 }
 
-function parseWidgets(wrapper) {
+function parseWidgetsAndMarkdown(wrapper) {
     const prose = wrapper.querySelector('.prose');
     if (!prose) return;
 
-    let text = prose.innerHTML; // get raw text/html including any already processed markup
+    let text = wrapper.dataset.rawText || '';
     const widgetRegex = /\[WIDGET:\s*([^\]]+)\]/g;
     let match;
-    let hasWidget = false;
     let widgetHTML = '';
 
-    while ((match = widgetRegex.exec(prose.innerText)) !== null) {
-        hasWidget = true;
+    while ((match = widgetRegex.exec(text)) !== null) {
         const payload = match[1].split('|').map(s => s.trim());
         const type = payload[0].toUpperCase();
 
@@ -309,14 +314,14 @@ function parseWidgets(wrapper) {
             const emoji = condition.toLowerCase().includes('cloud') ? '⛅' : (condition.toLowerCase().includes('rain') ? '🌧️' : '☀️');
             
             widgetHTML += `
-                <div class="mt-4 mb-2 bg-[#F6F4EF] dark:bg-[#2A2A28] border border-cozy-border dark:border-cozy-darkBorder rounded-[24px] p-5 w-fit shadow-sm flex items-center gap-6">
-                    <div>
-                        <div class="text-xs font-bold text-cozy-muted uppercase tracking-wider mb-1">${city}</div>
-                        <div class="text-3xl font-black text-cozy-text dark:text-cozy-darkText tracking-tighter leading-none">${temp}</div>
-                        <div class="text-[13.5px] font-medium text-cozy-text/70 dark:text-cozy-darkText/70 mt-1">${condition}</div>
-                    </div>
-                    <div class="w-14 h-14 rounded-[18px] bg-white dark:bg-cozy-darkBg flex items-center justify-center text-3xl shadow-sm border border-cozy-border/50 dark:border-cozy-darkBorder/50">
+                <div class="not-prose mt-4 mb-2 bg-[#F9F8F6] dark:bg-[#222222] border border-[#E5E2DB] dark:border-[#333333] rounded-[20px] p-4 inline-flex items-center shadow-sm">
+                    <div class="w-16 flex items-center justify-center text-[42px] leading-none shrink-0">
                         ${emoji}
+                    </div>
+                    <div class="flex flex-col border-l border-[#E5E2DB] dark:border-[#383838] pl-5 pr-2 py-1 ml-2">
+                        <div class="text-[10px] font-bold text-cozy-muted uppercase tracking-widest mb-1.5">${city}</div>
+                        <div class="text-[26px] font-black text-cozy-text dark:text-cozy-darkText tracking-tighter leading-none">${temp}</div>
+                        <div class="text-[13px] font-medium text-cozy-muted mt-1.5 capitalize">${condition}</div>
                     </div>
                 </div>
             `;
@@ -325,41 +330,95 @@ function parseWidgets(wrapper) {
             const artist = payload[2] || 'Unknown Artist';
             
             widgetHTML += `
-                <div class="mt-4 mb-2 bg-[#F6F4EF] dark:bg-[#2A2A28] border border-cozy-border dark:border-cozy-darkBorder rounded-[24px] p-5 w-fit shadow-sm flex items-center gap-5">
-                    <div class="w-14 h-14 rounded-full bg-cozy-accent text-white flex items-center justify-center text-2xl shadow-sm animate-[spin_4s_linear_infinite]">
-                        ♪
+                <div class="not-prose mt-4 mb-2 bg-[#F9F8F6] dark:bg-[#222222] border border-[#E5E2DB] dark:border-[#333333] rounded-[20px] p-4 pr-10 inline-flex items-center gap-4 relative overflow-hidden shadow-sm">
+                    <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-[#1DB954]"></div>
+                    <div class="w-12 h-12 rounded-full bg-[#1DB954] text-[#F9F8F6] flex items-center justify-center text-2xl shadow-md ml-3 shrink-0">
+                        <span>♪</span>
                     </div>
-                    <div class="pr-4">
-                        <div class="text-[11px] font-bold text-cozy-muted uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                            <span class="w-1.5 h-1.5 rounded-full bg-[#1DB954] animate-pulse"></span> Now Playing
+                    <div class="flex flex-col pl-2">
+                        <div class="text-[10px] font-bold text-[#1DB954] uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-[#1DB954]"></span> NOW PLAYING
                         </div>
-                        <div class="text-lg font-black text-cozy-text dark:text-cozy-darkText tracking-tight leading-tight">${song}</div>
-                        <div class="text-[14px] font-medium text-cozy-muted mt-0.5">${artist}</div>
+                        <div class="text-[18px] font-black text-cozy-text dark:text-cozy-darkText tracking-tight leading-none mb-1">${song}</div>
+                        <div class="text-[13px] font-medium text-cozy-muted">${artist}</div>
+                    </div>
+                </div>
+            `;
+        } else if (type === 'SYSTEM') {
+            const cpu = payload[1] || 'CPU: --';
+            const gpu = payload[2] || 'GPU: --';
+            const ram = payload[3] || 'RAM: --';
+            
+            widgetHTML += `
+                <div class="not-prose mt-4 mb-2 bg-[#F9F8F6] dark:bg-[#222222] border border-[#E5E2DB] dark:border-[#333333] rounded-[20px] p-4 inline-flex items-center shadow-sm">
+                    <div class="w-16 flex items-center justify-center text-[36px] leading-none shrink-0">
+                        🖥️
+                    </div>
+                    <div class="flex flex-col border-l border-[#E5E2DB] dark:border-[#383838] pl-5 pr-4 py-1 ml-2">
+                        <div class="text-[10px] font-bold text-cozy-muted uppercase tracking-widest mb-1.5">SYSTEM STATUS</div>
+                        <div class="flex items-center gap-3 text-[13.5px] font-black text-cozy-text dark:text-cozy-darkText tracking-tight">
+                            <span>${cpu}</span>
+                            <span class="text-[#E5E2DB] dark:text-[#383838]">|</span>
+                            <span>${gpu}</span>
+                            <span class="text-[#E5E2DB] dark:text-[#383838]">|</span>
+                            <span>${ram}</span>
+                        </div>
                     </div>
                 </div>
             `;
         }
     }
 
-    if (hasWidget) {
-        // Strip the literal widget tags from the text
-        const cleanText = prose.innerHTML.replace(/\[WIDGET:[^\]]+\]/g, '');
-        prose.innerHTML = cleanText + widgetHTML;
-    }
+    // Strip complete widget tags from text
+    const cleanText = text.replace(/\[WIDGET:[^\]]+\]/g, '');
+    
+    // Configure marked to use line breaks and smartypants
+    marked.setOptions({
+        breaks: true,
+        gfm: true,
+    });
+    
+    const parsedHTML = marked.parse(cleanText);
+    prose.innerHTML = parsedHTML + widgetHTML;
 }
 
-function appendToolExecution(toolName) {
+function appendToolExecution(toolData, args) {
     const emptyState = chatFeed.querySelector('.m-auto');
     if (emptyState) emptyState.remove();
+
+    let toolName = typeof toolData === 'string' ? toolData : toolData.name;
+    let toolArgs = args || (typeof toolData === 'object' ? toolData.args : {});
+
+    // For backwards compatibility with old SQLite rows where content is just "perform_web_search"
+    if (typeof toolData === 'string' && toolData.startsWith('{')) {
+        try {
+            const parsed = JSON.parse(toolData);
+            toolName = parsed.name;
+            toolArgs = parsed.args;
+        } catch (e) {
+            // it's just a raw string
+        }
+    }
 
     const wrapper = document.createElement('div');
     wrapper.className = 'w-full max-w-3xl mx-auto flex mb-6 justify-start pl-[56px] relative z-10';
 
     const block = document.createElement('div');
     block.className = 'flex items-center gap-2 bg-white/70 dark:bg-cozy-darkBubble/70 backdrop-blur-sm border border-dashed border-cozy-border dark:border-cozy-darkBorder rounded-[16px] px-4 py-2 font-mono text-[12.5px] text-cozy-muted w-fit shadow-sm';
+    
+    let displayString = `Looking at <span class="font-semibold text-cozy-text dark:text-cozy-darkText">${toolName}</span>`;
+    
+    if (toolName === 'perform_web_search' && toolArgs.query) {
+        displayString = `Performing web search for <span class="font-semibold text-cozy-text dark:text-cozy-darkText">"${toolArgs.query}"</span>`;
+    } else if (toolName === 'get_current_weather' && toolArgs.city_name) {
+        displayString = `Checking the weather in <span class="font-semibold text-cozy-text dark:text-cozy-darkText">${toolArgs.city_name}</span>`;
+    } else if (toolName === 'spotify_search_and_play' && toolArgs.query) {
+        displayString = `Playing <span class="font-semibold text-cozy-text dark:text-cozy-darkText">"${toolArgs.query}"</span> on Spotify`;
+    }
+
     block.innerHTML = `
         <span>✐</span>
-        <span>Looking at <span class="font-semibold text-cozy-text dark:text-cozy-darkText">${toolName}</span></span>
+        <span>${displayString}</span>
         <span class="tool-status ml-1 text-cozy-muted">...</span>
     `;
 
