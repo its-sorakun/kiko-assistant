@@ -27,6 +27,8 @@ con = sqlite3.connect(db_path)
 cur = con.cursor()
 cur.execute("CREATE TABLE IF NOT EXISTS core_preferences(key TEXT PRIMARY KEY, value TEXT)")
 cur.execute("CREATE TABLE IF NOT EXISTS semantic_memory(id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, vector BLOB, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)")
+cur.execute("CREATE TABLE IF NOT EXISTS chat_sessions(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)")
+cur.execute("CREATE TABLE IF NOT EXISTS chat_messages(id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, role TEXT, content TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(session_id) REFERENCES chat_sessions(id))")
 
 def memorize_preferences(key: str, value: str):
     """Memorize a core preference about senpai. Use this when senpai tells you to remember a personal preference."""
@@ -90,3 +92,20 @@ def recall_semantic_memory(query_vector: list):
     if best_score > 0.65:
         return best_content
     return None
+
+def create_chat_session(title: str = "New Session"):
+    cur.execute("INSERT INTO chat_sessions (title) VALUES (?)", (title,))
+    con.commit()
+    return cur.lastrowid
+
+def get_chat_sessions():
+    cur.execute("SELECT id, title, timestamp FROM chat_sessions ORDER BY timestamp DESC")
+    return [{"id": row[0], "title": row[1], "timestamp": row[2]} for row in cur.fetchall()]
+
+def save_chat_message(session_id: int, role: str, content: str):
+    cur.execute("INSERT INTO chat_messages (session_id, role, content) VALUES (?, ?, ?)", (session_id, role, content))
+    con.commit()
+
+def get_chat_messages(session_id: int):
+    cur.execute("SELECT role, content, timestamp FROM chat_messages WHERE session_id = ? ORDER BY timestamp ASC", (session_id,))
+    return [{"role": row[0], "content": row[1], "timestamp": row[2]} for row in cur.fetchall()]
