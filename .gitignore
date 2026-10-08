@@ -35,6 +35,7 @@ Release/
 *.ilk
 scratch/
 dxgi_capture_backup.cpp
+start_server.bat
 
 # Virtual Environments
 venv/
