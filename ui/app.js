@@ -6,6 +6,12 @@ const newChatBtn = document.getElementById('new-chat-btn');
 const currentSessionTitle = document.getElementById('current-session-title');
 const themeToggleBtn = document.getElementById('theme-toggle');
 
+const uploadBtn = document.getElementById('upload-btn');
+const fileInput = document.getElementById('file-input');
+const imagePreviewContainer = document.getElementById('image-preview-container');
+const imagePreview = document.getElementById('image-preview');
+const removeImageBtn = document.getElementById('remove-image-btn');
+
 let currentSessionId = null;
 let ws = null;
 let isGenerating = false;
@@ -38,6 +44,54 @@ themeToggleBtn.onclick = toggleTheme;
 chatInput.addEventListener('input', function () {
     this.style.height = 'auto';
     this.style.height = (this.scrollHeight) + 'px';
+});
+
+let currentImagePath = null;
+
+function clearImageAttachment() {
+    currentImagePath = null;
+    fileInput.value = '';
+    imagePreviewContainer.classList.add('hidden');
+    imagePreview.src = '';
+}
+
+async function uploadImageFile(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+        const res = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        currentImagePath = data.path;
+        
+        const blobUrl = URL.createObjectURL(file);
+        imagePreview.src = blobUrl;
+        imagePreviewContainer.classList.remove('hidden');
+    } catch (e) {
+        console.error('Error uploading image', e);
+    }
+}
+
+uploadBtn.onclick = () => fileInput.click();
+fileInput.onchange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+        uploadImageFile(e.target.files[0]);
+    }
+};
+removeImageBtn.onclick = clearImageAttachment;
+
+document.addEventListener('paste', (e) => {
+    const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (let index in items) {
+        const item = items[index];
+        if (item.kind === 'file') {
+            const blob = item.getAsFile();
+            uploadImageFile(blob);
+            break; // only one image at a time
+        }
+    }
 });
 
 const emptyStateHTML = `
@@ -456,7 +510,7 @@ function scrollToBottom() {
 async function sendMessage() {
     if (isGenerating) return;
     const text = chatInput.value.trim();
-    if (!text) return;
+    if (!text && !currentImagePath) return;
 
     if (!currentSessionId) {
         const res = await fetch('/api/sessions', { method: 'POST' });
@@ -472,14 +526,20 @@ async function sendMessage() {
     } else if (!ws || ws.readyState !== 1) {
         return;
     }
+    
+    let finalPayload = text;
+    if (currentImagePath) {
+        finalPayload = `[ATTACHMENT: ${currentImagePath}]\n${text}`.trim();
+    }
 
-    appendMessage('user', text);
+    appendMessage('user', text || "(Attached Image)");
     scrollToBottom();
 
-    ws.send(text);
+    ws.send(finalPayload);
 
     chatInput.value = '';
     chatInput.style.height = 'auto';
+    clearImageAttachment();
     setInputState(true);
 }
 
