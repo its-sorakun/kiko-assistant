@@ -4,9 +4,22 @@ const chatInput = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
 const newChatBtn = document.getElementById('new-chat-btn');
 const currentSessionTitle = document.getElementById('current-session-title');
+const themeToggleBtn = document.getElementById('theme-toggle');
 
 let currentSessionId = null;
 let ws = null;
+
+// Elegant Theme Logic
+function toggleTheme() {
+    if (document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.remove('dark');
+        localStorage.theme = 'light';
+    } else {
+        document.documentElement.classList.add('dark');
+        localStorage.theme = 'dark';
+    }
+}
+themeToggleBtn.onclick = toggleTheme;
 
 // Auto-resize textarea
 chatInput.addEventListener('input', function() {
@@ -22,7 +35,11 @@ async function loadSessions() {
         sessionList.innerHTML = '';
         sessions.forEach(session => {
             const btn = document.createElement('button');
-            btn.className = `w-full text-left px-3 py-2 rounded-md text-sm truncate transition-colors mb-1 ${session.id === currentSessionId ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-600 hover:bg-gray-50'}`;
+            const isActive = session.id === currentSessionId;
+            btn.className = `w-full text-left px-3 py-2.5 rounded-lg text-sm truncate transition-all mb-1 
+                ${isActive 
+                    ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium shadow-sm border border-zinc-200 dark:border-zinc-700' 
+                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 border border-transparent'}`;
             btn.innerText = session.title;
             btn.onclick = () => loadChat(session.id, session.title);
             sessionList.appendChild(btn);
@@ -43,20 +60,18 @@ async function loadChat(sessionId, title) {
     currentSessionId = sessionId;
     currentSessionTitle.innerText = title;
     
-    // Update active state in sidebar
-    await loadSessions(); 
+    await loadSessions(); // refresh active state
     
-    // Fetch history
     const res = await fetch(`/api/sessions/${sessionId}`);
     const messages = await res.json();
     
-    chatFeed.innerHTML = ''; // Clear feed
+    chatFeed.innerHTML = ''; 
     
     if (messages.length === 0) {
         chatFeed.innerHTML = `
-            <div class="h-full flex flex-col items-center justify-center text-gray-400">
-                <div class="text-4xl mb-4">( ˘ ▽ ˘ )</div>
-                <p>Awaiting your command, Senpai...</p>
+            <div class="m-auto flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-600">
+                <div class="text-3xl mb-3 font-light">( ˘ ▽ ˘ )</div>
+                <p class="text-sm font-medium tracking-wide">Awaiting command, Senpai...</p>
             </div>
         `;
     } else {
@@ -83,8 +98,9 @@ function connectWebSocket(sessionId) {
             if (data.status === 'running') {
                 toolBlockDiv = appendToolExecution(data.tool);
             } else if (data.status === 'completed' && toolBlockDiv) {
-                toolBlockDiv.querySelector('.tool-status').innerText = '✓ Completed';
-                toolBlockDiv.querySelector('.tool-status').classList.replace('text-gray-400', 'text-teal-600');
+                toolBlockDiv.querySelector('.tool-status').innerText = 'Executed successfully';
+                toolBlockDiv.querySelector('.tool-status').classList.replace('text-zinc-400', 'text-teal-600');
+                toolBlockDiv.querySelector('.tool-status').classList.replace('dark:text-zinc-500', 'dark:text-teal-400');
             }
             scrollToBottom();
         } else if (data.type === 'token') {
@@ -98,30 +114,35 @@ function connectWebSocket(sessionId) {
             currentBotMessageDiv = null;
         }
     };
-    
-    ws.onclose = () => {
-        console.log("WebSocket disconnected.");
-    };
 }
 
 function createMessageDiv(role) {
     const isUser = role === 'user';
     const wrapper = document.createElement('div');
-    wrapper.className = `flex w-full ${isUser ? 'justify-end' : 'justify-start'}`;
+    wrapper.className = `flex w-full max-w-4xl mx-auto ${isUser ? 'justify-end' : 'justify-start'}`;
     
     const bubble = document.createElement('div');
-    // Muted teal/mint accent for user, crisp white for assistant
-    bubble.className = `max-w-[80%] rounded-2xl px-5 py-3 ${isUser ? 'bg-teal-50 border border-teal-100 text-gray-800 rounded-br-none' : 'bg-white border border-gray-100 text-gray-700 rounded-bl-none shadow-sm'}`;
+    
+    // Extremely aesthetic, refined flat styling
+    if (isUser) {
+        bubble.className = 'max-w-[85%] bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-5 py-3.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-sm border border-zinc-200/50 dark:border-zinc-700/50';
+    } else {
+        // Kiko's message floats cleanly without a background box, purely typography driven
+        bubble.className = 'max-w-[90%] text-zinc-800 dark:text-zinc-200 px-2 py-2 text-[15px] leading-relaxed';
+    }
     
     if (!isUser) {
         const header = document.createElement('div');
-        header.className = 'font-semibold text-[10px] text-gray-400 mb-1 tracking-widest uppercase';
-        header.innerText = 'KIKO SYSTEM';
+        header.className = 'flex items-center gap-2 mb-2';
+        header.innerHTML = `
+            <div class="w-1.5 h-1.5 rounded-full bg-teal-500"></div>
+            <span class="font-semibold text-[11px] text-zinc-500 dark:text-zinc-400 tracking-widest uppercase">Kiko</span>
+        `;
         bubble.appendChild(header);
     }
     
     const content = document.createElement('div');
-    content.className = 'prose text-sm leading-relaxed whitespace-pre-wrap';
+    content.className = 'prose whitespace-pre-wrap';
     bubble.appendChild(content);
     
     wrapper.appendChild(bubble);
@@ -129,7 +150,7 @@ function createMessageDiv(role) {
 }
 
 function appendMessage(role, text) {
-    const emptyState = chatFeed.querySelector('.h-full.flex');
+    const emptyState = chatFeed.querySelector('.m-auto');
     if (emptyState) emptyState.remove();
     
     const wrapper = createMessageDiv(role);
@@ -138,20 +159,21 @@ function appendMessage(role, text) {
 }
 
 function appendToolExecution(toolName) {
-    const emptyState = chatFeed.querySelector('.h-full.flex');
+    const emptyState = chatFeed.querySelector('.m-auto');
     if (emptyState) emptyState.remove();
 
     const wrapper = document.createElement('div');
-    wrapper.className = 'flex w-full justify-start';
+    wrapper.className = 'flex w-full max-w-4xl mx-auto justify-start my-2';
     
     const block = document.createElement('div');
-    block.className = 'max-w-[80%] bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono text-xs text-gray-600 flex flex-col gap-2 shadow-sm';
+    // Elegant, flat execution block with monospace font
+    block.className = 'bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 font-mono text-[11px] text-zinc-600 dark:text-zinc-400 flex flex-col gap-1.5 ml-2';
     block.innerHTML = `
         <div class="flex items-center gap-2">
-            <svg class="w-3 h-3 text-teal-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-            <span class="font-semibold text-gray-800">> OS_HOOK: ${toolName}</span>
+            <svg class="w-3.5 h-3.5 text-teal-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+            <span class="font-medium text-zinc-800 dark:text-zinc-200">os.execute('${toolName}')</span>
         </div>
-        <div class="tool-status text-gray-400 ml-5">Executing native function...</div>
+        <div class="tool-status text-zinc-400 dark:text-zinc-500 ml-5.5">Running native hook...</div>
     `;
     
     wrapper.appendChild(block);
