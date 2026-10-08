@@ -55,7 +55,7 @@ def toggle_bluetooth_power(enable: bool) -> str:
         return "CRITICAL SYSTEM ERROR: ToggleBluetooth.ps1 script is missing."
         
     # Dynamically inject WinRT UWP permission via CapabilityAccessManager
-    from permissions_handle import toggle_windows_permission, get_windows_permission_status
+    from .permissions_handle import toggle_windows_permission, get_windows_permission_status
     was_enabled = get_windows_permission_status('radios')
     if not was_enabled:
         toggle_windows_permission('radios', True)
