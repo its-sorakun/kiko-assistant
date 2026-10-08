@@ -34,6 +34,11 @@ if not os.path.exists(ui_dir):
 
 app.mount("/ui", StaticFiles(directory=ui_dir, html=True), name="ui")
 
+scratch_dir = os.path.join(os.path.dirname(__file__), "scratch")
+if not os.path.exists(scratch_dir):
+    os.makedirs(scratch_dir)
+app.mount("/scratch", StaticFiles(directory=scratch_dir), name="scratch")
+
 @app.get("/")
 async def root():
     # Redirect root to the UI

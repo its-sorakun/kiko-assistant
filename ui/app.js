@@ -315,7 +315,20 @@ function appendMessage(role, text) {
         updateEmpathyEngine(wrapper, text);
         parseWidgetsAndMarkdown(wrapper);
     } else {
-        wrapper.querySelector('.prose').innerText = text;
+        const prose = wrapper.querySelector('.prose');
+        const attachMatch = text.match(/^\[ATTACHMENT:\s*(.*?[\\/]?upload_[^\]]+)\]\n?([\s\S]*)$/i);
+        if (attachMatch) {
+            const absolutePath = attachMatch[1];
+            const filename = absolutePath.split(/[\\/]/).pop();
+            const messageText = attachMatch[2].trim() || "(Attached Image)";
+            
+            prose.innerHTML = `
+                <img src="/scratch/${filename}" class="max-w-xs rounded-xl mb-3 border border-cozy-border dark:border-cozy-darkBorder shadow-sm object-cover" />
+                <div>${messageText}</div>
+            `;
+        } else {
+            prose.innerText = text;
+        }
     }
     chatFeed.appendChild(wrapper);
 }
@@ -532,7 +545,7 @@ async function sendMessage() {
         finalPayload = `[ATTACHMENT: ${currentImagePath}]\n${text}`.trim();
     }
 
-    appendMessage('user', text || "(Attached Image)");
+    appendMessage('user', finalPayload);
     scrollToBottom();
 
     ws.send(finalPayload);
