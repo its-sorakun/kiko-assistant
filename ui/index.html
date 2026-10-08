@@ -166,6 +166,19 @@
         </div>
     </main>
 
+    <!-- Custom Confirm Modal -->
+    <div id="confirm-modal" class="fixed inset-0 bg-cozy-bg/80 dark:bg-cozy-darkBg/90 z-50 hidden flex items-center justify-center opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-cozy-darkBubble border-2 border-cozy-border dark:border-cozy-darkBorder rounded-[28px] p-8 max-w-[320px] w-full mx-4 shadow-sm transform scale-95 transition-transform duration-300">
+            <div class="text-4xl text-center mb-3">🥀</div>
+            <h3 class="font-serif text-xl text-cozy-text dark:text-cozy-darkText mb-2 text-center">Erase memory?</h3>
+            <p class="text-cozy-muted text-[14px] text-center mb-8 font-medium">This cannot be undone, senpai.</p>
+            <div class="flex gap-3">
+                <button id="modal-cancel" class="flex-1 py-2.5 px-4 rounded-[16px] border-2 border-cozy-border dark:border-cozy-darkBorder text-cozy-text dark:text-cozy-darkText text-[14.5px] font-semibold hover:bg-cozy-sidebar dark:hover:bg-cozy-darkSidebar transition-colors">Keep it</button>
+                <button id="modal-confirm" class="flex-1 py-2.5 px-4 rounded-[16px] bg-cozy-terracotta text-white text-[14.5px] font-semibold hover:opacity-90 transition-opacity shadow-sm">Erase</button>
+            </div>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
