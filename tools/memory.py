@@ -109,3 +109,8 @@ def save_chat_message(session_id: int, role: str, content: str):
 def get_chat_messages(session_id: int):
     cur.execute("SELECT role, content, timestamp FROM chat_messages WHERE session_id = ? ORDER BY timestamp ASC", (session_id,))
     return [{"role": row[0], "content": row[1], "timestamp": row[2]} for row in cur.fetchall()]
+
+def delete_chat_session(session_id: int):
+    cur.execute("DELETE FROM chat_messages WHERE session_id = ?", (session_id,))
+    cur.execute("DELETE FROM chat_sessions WHERE id = ?", (session_id,))
+    con.commit()

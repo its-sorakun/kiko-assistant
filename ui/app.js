@@ -9,7 +9,6 @@ const themeToggleBtn = document.getElementById('theme-toggle');
 let currentSessionId = null;
 let ws = null;
 
-// Elegant Theme Logic
 function toggleTheme() {
     if (document.documentElement.classList.contains('dark')) {
         document.documentElement.classList.remove('dark');
@@ -21,11 +20,19 @@ function toggleTheme() {
 }
 themeToggleBtn.onclick = toggleTheme;
 
-// Auto-resize textarea
 chatInput.addEventListener('input', function() {
     this.style.height = 'auto';
     this.style.height = (this.scrollHeight) + 'px';
 });
+
+const emptyStateHTML = `
+    <div class="m-auto flex flex-col items-center justify-center h-full">
+        <div class="px-10 py-6 border-wavy-bottom flex flex-col items-center">
+            <div class="text-[54px] mb-4 font-light text-cozy-accent opacity-90 animate-float-slow">🪴</div>
+            <p class="text-[19px] font-serif italic text-cozy-text dark:text-cozy-darkText">What's on your mind?</p>
+        </div>
+    </div>
+`;
 
 async function loadSessions() {
     try {
@@ -34,33 +41,65 @@ async function loadSessions() {
         
         sessionList.innerHTML = '';
         sessions.forEach(session => {
-            const btn = document.createElement('button');
+            const container = document.createElement('div');
             const isActive = session.id === currentSessionId;
-            btn.className = `w-full text-left px-3 py-2.5 rounded-lg text-sm truncate transition-all mb-1 
+            
+            // Using dashed border for active state
+            container.className = `group flex items-center justify-between w-full px-4 py-3 rounded-[16px] text-[14.5px] font-medium transition-colors cursor-pointer border-2
                 ${isActive 
-                    ? 'bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 font-medium shadow-sm border border-zinc-200 dark:border-zinc-700' 
-                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200/50 dark:hover:bg-zinc-800/50 border border-transparent'}`;
-            btn.innerText = session.title;
-            btn.onclick = () => loadChat(session.id, session.title);
-            sessionList.appendChild(btn);
+                    ? 'bg-white dark:bg-cozy-darkBubble text-cozy-text dark:text-cozy-darkText border-dashed border-cozy-terracotta/40 dark:border-cozy-terracotta/30 shadow-sm' 
+                    : 'border-transparent text-cozy-muted hover:bg-white/50 dark:hover:bg-cozy-darkBubble/50 hover:text-cozy-text dark:hover:text-cozy-darkText'}`;
+            
+            const titleSpan = document.createElement('span');
+            titleSpan.className = 'truncate flex-1';
+            titleSpan.innerText = session.title;
+            titleSpan.onclick = () => loadChat(session.id, session.title);
+            
+            // Delete button - Terracotta color on hover
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = `p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:text-cozy-terracotta text-cozy-muted`;
+            deleteBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                deleteSession(session.id);
+            };
+            
+            container.appendChild(titleSpan);
+            container.appendChild(deleteBtn);
+            sessionList.appendChild(container);
         });
     } catch (e) {
         console.error("Failed to load sessions", e);
     }
 }
 
+async function deleteSession(id) {
+    if(!confirm("Erase this memory?")) return;
+    
+    await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+    
+    if (currentSessionId === id) {
+        currentSessionId = null;
+        currentSessionTitle.innerText = "";
+        chatFeed.innerHTML = emptyStateHTML;
+        if (ws) ws.close();
+    }
+    
+    await loadSessions();
+}
+
 async function createSession() {
     const res = await fetch('/api/sessions', { method: 'POST' });
     const data = await res.json();
     await loadSessions();
-    loadChat(data.id, 'New Arc');
+    loadChat(data.id, 'New Chat');
 }
 
 async function loadChat(sessionId, title) {
     currentSessionId = sessionId;
     currentSessionTitle.innerText = title;
     
-    await loadSessions(); // refresh active state
+    await loadSessions(); 
     
     const res = await fetch(`/api/sessions/${sessionId}`);
     const messages = await res.json();
@@ -68,12 +107,7 @@ async function loadChat(sessionId, title) {
     chatFeed.innerHTML = ''; 
     
     if (messages.length === 0) {
-        chatFeed.innerHTML = `
-            <div class="m-auto flex flex-col items-center justify-center text-zinc-400 dark:text-zinc-600">
-                <div class="text-3xl mb-3 font-light">( ˘ ▽ ˘ )</div>
-                <p class="text-sm font-medium tracking-wide">Awaiting command, Senpai...</p>
-            </div>
-        `;
+        chatFeed.innerHTML = emptyStateHTML;
     } else {
         messages.forEach(msg => {
             appendMessage(msg.role, msg.content);
@@ -98,9 +132,9 @@ function connectWebSocket(sessionId) {
             if (data.status === 'running') {
                 toolBlockDiv = appendToolExecution(data.tool);
             } else if (data.status === 'completed' && toolBlockDiv) {
-                toolBlockDiv.querySelector('.tool-status').innerText = 'Executed successfully';
-                toolBlockDiv.querySelector('.tool-status').classList.replace('text-zinc-400', 'text-teal-600');
-                toolBlockDiv.querySelector('.tool-status').classList.replace('dark:text-zinc-500', 'dark:text-teal-400');
+                const statusSpan = toolBlockDiv.querySelector('.tool-status');
+                statusSpan.innerHTML = 'done <span class="text-[14px]">✦</span>';
+                statusSpan.classList.replace('text-cozy-muted', 'text-cozy-terracotta');
             }
             scrollToBottom();
         } else if (data.type === 'token') {
@@ -119,30 +153,27 @@ function connectWebSocket(sessionId) {
 function createMessageDiv(role) {
     const isUser = role === 'user';
     const wrapper = document.createElement('div');
-    wrapper.className = `flex w-full max-w-4xl mx-auto ${isUser ? 'justify-end' : 'justify-start'}`;
+    wrapper.className = `w-full max-w-3xl mx-auto flex mb-8 ${isUser ? 'justify-end' : 'justify-start'} relative z-10`;
     
     const bubble = document.createElement('div');
     
-    // Extremely aesthetic, refined flat styling
     if (isUser) {
-        bubble.className = 'max-w-[85%] bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-5 py-3.5 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed shadow-sm border border-zinc-200/50 dark:border-zinc-700/50';
+        bubble.className = 'max-w-[75%] bg-white dark:bg-cozy-darkBubble border-2 border-cozy-border dark:border-cozy-darkBorder text-cozy-text dark:text-cozy-darkText px-6 py-4 rounded-[28px] rounded-br-[8px] text-[15.5px] leading-relaxed shadow-sm font-medium';
     } else {
-        // Kiko's message floats cleanly without a background box, purely typography driven
-        bubble.className = 'max-w-[90%] text-zinc-800 dark:text-zinc-200 px-2 py-2 text-[15px] leading-relaxed';
-    }
-    
-    if (!isUser) {
-        const header = document.createElement('div');
-        header.className = 'flex items-center gap-2 mb-2';
-        header.innerHTML = `
-            <div class="w-1.5 h-1.5 rounded-full bg-teal-500"></div>
-            <span class="font-semibold text-[11px] text-zinc-500 dark:text-zinc-400 tracking-widest uppercase">Kiko</span>
+        bubble.className = 'w-full flex gap-4 text-cozy-text dark:text-cozy-darkText text-[15.5px] leading-relaxed font-medium relative';
+        
+        const avatar = document.createElement('div');
+        // Cozy Kiko Avatar with terracotta dot
+        avatar.className = 'w-10 h-10 rounded-[16px] bg-cozy-accent flex items-center justify-center shrink-0 mt-0.5 text-white shadow-sm relative';
+        avatar.innerHTML = `
+            <span class="text-[16px] animate-pulse">❀</span>
+            <span class="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-cozy-terracotta border-2 border-cozy-bg dark:border-cozy-darkBg rounded-full"></span>
         `;
-        bubble.appendChild(header);
+        bubble.appendChild(avatar);
     }
     
     const content = document.createElement('div');
-    content.className = 'prose whitespace-pre-wrap';
+    content.className = 'prose whitespace-pre-wrap flex-1 pt-1';
     bubble.appendChild(content);
     
     wrapper.appendChild(bubble);
@@ -163,17 +194,14 @@ function appendToolExecution(toolName) {
     if (emptyState) emptyState.remove();
 
     const wrapper = document.createElement('div');
-    wrapper.className = 'flex w-full max-w-4xl mx-auto justify-start my-2';
+    wrapper.className = 'w-full max-w-3xl mx-auto flex mb-6 justify-start pl-[56px] relative z-10';
     
     const block = document.createElement('div');
-    // Elegant, flat execution block with monospace font
-    block.className = 'bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 font-mono text-[11px] text-zinc-600 dark:text-zinc-400 flex flex-col gap-1.5 ml-2';
+    block.className = 'flex items-center gap-2 bg-white/70 dark:bg-cozy-darkBubble/70 backdrop-blur-sm border border-dashed border-cozy-border dark:border-cozy-darkBorder rounded-[16px] px-4 py-2 font-mono text-[12.5px] text-cozy-muted w-fit shadow-sm';
     block.innerHTML = `
-        <div class="flex items-center gap-2">
-            <svg class="w-3.5 h-3.5 text-teal-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-            <span class="font-medium text-zinc-800 dark:text-zinc-200">os.execute('${toolName}')</span>
-        </div>
-        <div class="tool-status text-zinc-400 dark:text-zinc-500 ml-5.5">Running native hook...</div>
+        <span>✐</span>
+        <span>Looking at <span class="font-semibold text-cozy-text dark:text-cozy-darkText">${toolName}</span></span>
+        <span class="tool-status ml-1 text-cozy-muted">...</span>
     `;
     
     wrapper.appendChild(block);
@@ -185,9 +213,24 @@ function scrollToBottom() {
     chatFeed.scrollTop = chatFeed.scrollHeight;
 }
 
-function sendMessage() {
+async function sendMessage() {
     const text = chatInput.value.trim();
-    if (!text || !ws || !currentSessionId) return;
+    if (!text) return;
+    
+    if (!currentSessionId) {
+        const res = await fetch('/api/sessions', { method: 'POST' });
+        const data = await res.json();
+        await loadChat(data.id, 'New Chat');
+        await loadSessions();
+        
+        let retries = 0;
+        while (ws.readyState !== 1 && retries < 10) {
+            await new Promise(r => setTimeout(r, 100));
+            retries++;
+        }
+    } else if (!ws || ws.readyState !== 1) {
+        return;
+    }
     
     appendMessage('user', text);
     scrollToBottom();
@@ -207,5 +250,4 @@ chatInput.onkeydown = (e) => {
 };
 newChatBtn.onclick = createSession;
 
-// Init
 loadSessions();

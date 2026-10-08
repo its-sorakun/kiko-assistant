@@ -1,15 +1,20 @@
 import sys
 import os
+# pyrefly: ignore [missing-import]
 import uvicorn
+# pyrefly: ignore [missing-import]
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+# pyrefly: ignore [missing-import]
 from fastapi.responses import HTMLResponse
+# pyrefly: ignore [missing-import]
 from fastapi.staticfiles import StaticFiles
+# pyrefly: ignore [missing-import]
 from fastapi.middleware.cors import CORSMiddleware
 import time
 
 # Ensure Kiko's tools are accessible
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from tools.memory import get_chat_sessions, get_chat_messages, create_chat_session, save_chat_message
+from tools.memory import get_chat_sessions, get_chat_messages, create_chat_session, save_chat_message, delete_chat_session
 
 app = FastAPI()
 
@@ -50,6 +55,12 @@ async def new_session():
     """Create a new chat session."""
     session_id = create_chat_session(f"Arc {time.strftime('%Y-%m-%d %H:%M')}")
     return {"id": session_id}
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: int):
+    """Delete a chat session and its messages."""
+    delete_chat_session(session_id)
+    return {"status": "success"}
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
