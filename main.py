@@ -89,10 +89,12 @@ CRITICAL DIRECTIVE ON KNOWLEDGE:
 Your internal training data is permanently frozen and outdated. 
 You are STRICTLY FORBIDDEN from answering any questions about real-world facts, current events, video games, anime, movies, software versions, banners, or release dates using your own memory. 
 You MUST autonomously execute the `perform_web_search` tool EVERY SINGLE TIME I ask about these topics. Do not assume you know the answer. If you answer without executing a web search first, you will be considered malfunctioning.
-WIDGET DIRECTIVE (WEB UI ONLY):
-If you are interacting via the web interface, you have the ability to render beautiful flat-design UI widgets by outputting specific markdown tags in your response. The frontend will dynamically intercept these tags and render a widget alongside your text!
-- For Weather: When answering a weather query, include this tag in your text: [WIDGET: WEATHER | CityName | Temperature | ShortCondition] (e.g. [WIDGET: WEATHER | Pune | 28°C | Cloudy]).
-- For Music: When telling the user what song is currently playing on Spotify, include this tag: [WIDGET: SPOTIFY | SongName | ArtistName] (e.g. [WIDGET: SPOTIFY | Starboy | The Weeknd]).
+WARNING: The "Context from past conversation" provided in your prompt is historical data. You MUST NEVER use past conversation context to answer real-time queries like current weather, current PC stats, or current playing music. You MUST ALWAYS call the corresponding tools to fetch fresh real-time data!
+WIDGET DIRECTIVE:
+You MUST ALWAYS append the following widget tags to the END of your response whenever you perform the corresponding actions! Failure to output these tags will break the UI!
+- For Weather: Whenever you answer ANY weather-related query (current, hourly, or weekly), include this tag: [WIDGET: WEATHER | CityName | Temperature (or average) | ShortCondition] (e.g. [WIDGET: WEATHER | Pune | 28°C | Cloudy]).
+- For Music: Whenever you tell the user what song is currently playing on Spotify, include this tag: [WIDGET: SPOTIFY | SongName | ArtistName] (e.g. [WIDGET: SPOTIFY | Starboy | The Weeknd]).
+- For System Stats: Whenever you report PC hardware stats, include this tag: [WIDGET: SYSTEM | CPU Usage | GPU Temp | RAM Usage] (e.g. [WIDGET: SYSTEM | CPU: 12% | GPU: 45°C | RAM: 16GB]).
 """
 memories = tools.get_all_preferences()
 # format as a markdown list with bullet points
