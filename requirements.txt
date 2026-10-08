@@ -154,3 +154,5 @@ langchain-core
 langchain-text-splitters
 langchain-community
 langchain-huggingface
+fastapi
+uvicorn
