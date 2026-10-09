@@ -203,13 +203,15 @@ When Kiko needs to infer the physical location of the host machine for environme
 - **Endpoint Rotation**: The system natively initiates a 3000ms-timeout request to the primary unauthenticated tracker (`ip-api.com`). If the DNS fails or the socket resets, the Python runtime quietly catches the exception and immediately rotates through secondary and tertiary endpoints (`ipapi.co`, then `ipinfo.io`). 
 - **Dynamic JSON Parsing**: Because each provider architects their JSON payloads differently (e.g., `lat`/`lon` floats versus a singular `loc` string requiring runtime splitting), the parser mechanically adapts to the specific payload format of whichever API survives the sinkhole, ensuring Kiko always gets her coordinates without bothering the user.
 
-## 22. Bi-Directional UDP Terminal Interceptor
-**Files:** `tools/kiko_shell/kiko_shell.cpp`, `main.py` -> `terminal_interceptor_thread()`
+## 22. Global Terminal API Hooking (IFEO & WriteConsoleW)
+**Files:** `tools/terminal_hook/injector.cpp`, `tools/terminal_hook/hook.cpp`, `server.py`
 
-To allow Kiko to actively observe and diagnose shell errors without requiring the user to manually copy-paste them, a custom Win32 C++ wrapper (`kiko_shell.exe`) hijacks the `STDERR` pipe of a spawned PowerShell process.
-- **Connectionless IPC**: Instead of blocking on a TCP handshake, the C++ wrapper blasts captured errors over UDP. This guarantees the terminal never hangs or crashes if Kiko's Python process is not running. 
-- **Dynamic Port Failover**: If Kiko fails to bind to port 5555 on startup (e.g., zombie process), she iterates to a free port and writes it to `.kiko_port`. The C++ wrapper natively `fopen`s this file immediately before calling `sendto`, allowing instantaneous adaptation to Kiko's port changes without requiring a shell restart.
-- **Two-Way Injection**: Kiko extracts the ephemeral UDP port from the incoming packet's `addr` block and fires her LLM-generated hint back to the exact socket. The C++ wrapper receives this payload on a detached `std::thread` and injects it directly into the user's `stdout` stream using ANSI color codes.
+To allow Kiko to actively observe and diagnose shell errors globally, without requiring a custom wrapper, Kiko hooks directly into the underlying Win32 console API across the entire OS.
+- **Global IFEO Registry Hijack**: To globally monitor all PowerShell instances regardless of how they are spawned, Kiko injects a `Debugger` string into the Image File Execution Options (IFEO) registry key for `powershell.exe`. When Windows attempts to launch PowerShell, it redirects execution to a custom C++ `injector.exe`.
+- **Debug Process Bypassing**: The `injector.exe` spawns the real PowerShell utilizing the `DEBUG_PROCESS | DEBUG_ONLY_THIS_PROCESS` creation flags. This natively bypasses the IFEO recursive infinite loop, allowing the injector to instantly `DebugActiveProcessStop` and execute a `CreateRemoteThread` DLL injection into the PowerShell process space before terminating itself.
+- **Native `WriteConsoleW` Hooking**: The injected `hook.dll` patches the `kernel32.dll!WriteConsoleW` API via a 14-byte absolute jump instruction. Instead of relying on flakey `STDERR` pipes (which modern PowerShell routes to `STDOUT`), the hook intercepts all wide-character text right before it hits the console buffer, maintaining a rolling 4096-character history.
+- **Synchronous Execution Freeze**: Upon detecting PowerShell error signatures (`CategoryInfo`, `FullyQualifiedErrorId`) in the rolling buffer, the DLL fires the context payload via UDP to Kiko. Crucially, it then intentionally blocks the `WriteConsoleW` execution thread. This paralyzes the PowerShell process, physically preventing it from requesting keyboard input or rendering the next prompt until Kiko's response is received.
+- **UTF-16 Render Pass**: Once the UDP response is captured, Kiko's raw UTF-8 output is converted to UTF-16 (`MultiByteToWideChar`) and printed natively via the original unpatched `WriteConsoleW` pointer. This ensures complex emojis and kaomoji render flawlessly in the Windows console before the terminal is unfrozen.
 
 ## 23. Dynamic Empathy Engine (UI Kaomoji Sync)
 **Files:** `ui/app.js` -> `updateEmpathyEngine()`
