@@ -229,7 +229,7 @@ def terminal_interceptor_thread():
                 print(f"\n   [⚡ Kiko intercepted a terminal error! Analyzing...]")
                 
                 global client, model_name, config
-                prompt = f"I just typed a bad command in my terminal and got this error:\n{error_msg}\nGive me a quick 1-sentence hint on how to fix it!"
+                prompt = f"I just typed a bad command in my terminal and got this error:\n{error_msg}\nGive me a quick 1-sentence hint on how to fix it, and playfully roast me a little bit for making the typo! You are an anime girl assistant, keep it cute but sassy."
                 
                 response = client.models.generate_content(
                     model=model_name,
