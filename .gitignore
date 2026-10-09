@@ -40,3 +40,4 @@ start_server.bat
 # Virtual Environments
 venv/
 .kiko_port
+.agents
