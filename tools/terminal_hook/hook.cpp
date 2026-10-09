@@ -128,8 +128,7 @@ BOOL WINAPI HookedWriteConsoleW(
 
     // 3. Look for PowerShell error signatures in the incoming chunk
     bool isErrorTriggered = false;
-    if (chunk.find(L"CategoryInfo") != std::wstring::npos || 
-        chunk.find(L"FullyQualifiedErrorId") != std::wstring::npos) {
+    if (chunk.find(L"FullyQualifiedErrorId") != std::wstring::npos) {
         
         isErrorTriggered = true;
         

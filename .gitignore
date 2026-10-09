@@ -24,7 +24,6 @@ Legacy/
 stash/
 md/
 not_relavant/
-hook_old_27852.dll
 .cache
 # Visual Studio Build Artifacts (C++ cpu_monitor)
 .vs/
