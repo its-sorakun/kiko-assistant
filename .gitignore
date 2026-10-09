@@ -24,6 +24,7 @@ Legacy/
 stash/
 md/
 not_relavant/
+hook_old_27852.dll
 .cache
 # Visual Studio Build Artifacts (C++ cpu_monitor)
 .vs/
@@ -36,7 +37,6 @@ Release/
 scratch/
 dxgi_capture_backup.cpp
 start_server.bat
-
 # Virtual Environments
 venv/
 .kiko_port
