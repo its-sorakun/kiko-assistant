@@ -1,11 +1,19 @@
+// injector.cpp - IFEO interceptor and DLL injection harness
+// Implementation details:
+// Windows Image File Execution Options (IFEO) redirects process creation of powershell.exe
+// to this binary. To prevent infinite recursion, the target process is spawned with DEBUG_PROCESS,
+// which causes the kernel to bypass IFEO for child processes.
+// Once created, the full startup context (STARTUPINFO, standard handles, and ConPTY pipes)
+// is inherited so integrated terminal managers like Antigravity maintain full connectivity.
+// The hook DLL is injected into the remote process via CreateRemoteThread and LoadLibraryW.
+// The debugger is detached, and the injector process waits for the child process to terminate,
+// forwarding the exit code and ignoring Ctrl+C events so terminal sessions remain alive.
+
 #include <windows.h>
 #include <iostream>
 #include <string>
 
 int main(int argc, char* argv[]) {
-    // IFEO passes the original command line but prefixed with our injector
-    // e.g., injector.exe "C:\...\powershell.exe" -NoProfile ...
-    
     if (argc < 2) {
         std::cerr << "[-] Needs target executable.\n";
         return 1;
@@ -14,7 +22,7 @@ int main(int argc, char* argv[]) {
     // Reconstruct command line securely using GetCommandLineW
     LPWSTR rawCmdLine = GetCommandLineW();
     
-    // We need to skip the first argument (injector.exe)
+    // Skip the first argument (injector.exe)
     bool inQuotes = false;
     int skipIdx = 0;
     while (rawCmdLine[skipIdx]) {
@@ -25,21 +33,28 @@ int main(int argc, char* argv[]) {
         }
         skipIdx++;
     }
+
+    while (rawCmdLine[skipIdx] == L' ') {
+        skipIdx++;
+    }
     
     std::wstring cmdLine = &rawCmdLine[skipIdx];
+    if (cmdLine.empty()) {
+        cmdLine = L"powershell.exe";
+    }
 
+    // Forward the parent process startup info to preserve standard streams and ConPTY handles
     STARTUPINFOW si = { sizeof(si) };
+    GetStartupInfoW(&si);
     PROCESS_INFORMATION pi = { 0 };
-
-    std::wcout << L"[*] Kiko IFEO Intercept: Spawning suspended -> " << cmdLine << L"\n";
 
     if (!CreateProcessW(
         NULL,
         &cmdLine[0],
         NULL,
         NULL,
-        FALSE,
-        DEBUG_PROCESS | DEBUG_ONLY_THIS_PROCESS, // Bypasses IFEO infinite loop!
+        TRUE, // Inherit standard handles and terminal pipes
+        DEBUG_PROCESS | DEBUG_ONLY_THIS_PROCESS, // Bypasses IFEO infinite loop
         NULL,
         NULL,
         &si,
@@ -49,13 +64,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Path to our hook DLL (must be absolute)
+    // Path to hook DLL (located in the same directory as injector)
     wchar_t dllPath[MAX_PATH];
     GetModuleFileNameW(NULL, dllPath, MAX_PATH);
     std::wstring dllStr = dllPath;
     dllStr = dllStr.substr(0, dllStr.find_last_of(L"\\/")) + L"\\hook.dll";
-
-    std::wcout << L"[*] Injecting: " << dllStr << L"\n";
 
     size_t pathSize = (dllStr.length() + 1) * sizeof(wchar_t);
     LPVOID remoteMem = VirtualAllocEx(pi.hProcess, NULL, pathSize, MEM_COMMIT, PAGE_READWRITE);
@@ -81,18 +94,21 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // We don't wait for the thread here because the process is frozen by the debugger.
-    // Instead, we just detach the debugger. This instantly resumes ALL threads in the process,
-    // including the main PowerShell thread AND our newly created LoadLibrary thread!
-    std::wcout << L"[+] Bypassing IFEO and resuming PowerShell...\n";
+    // Detach debugger to resume all threads in PowerShell
     DebugActiveProcessStop(pi.dwProcessId);
-
     CloseHandle(hThread);
-    // Note: We intentionally don't free remoteMem immediately because LoadLibrary needs time to read it.
-    // It's a tiny leak in the powershell process, but completely safe.
+
+    // Ignore Ctrl+C in injector so PowerShell handles keyboard interrupts directly
+    SetConsoleCtrlHandler(NULL, TRUE);
+
+    // Keep injector process alive as long as PowerShell is running
+    WaitForSingleObject(pi.hProcess, INFINITE);
+
+    DWORD exitCode = 0;
+    GetExitCodeProcess(pi.hProcess, &exitCode);
 
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
 
-    return 0;
+    return (int)exitCode;
 }
