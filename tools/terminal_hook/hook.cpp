@@ -41,6 +41,7 @@ void SetupUDP() {
 }
 
 void BlastUDP(const std::string& msg) {
+    serverAddr.sin_port = htons(GetKikoPort());
     sendto(udpSocket, msg.c_str(), msg.length(), 0, (sockaddr*)&serverAddr, sizeof(serverAddr));
 }
 
