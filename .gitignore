@@ -25,6 +25,8 @@ stash/
 md/
 not_relavant/
 .cache
+push-script.ps1
+
 # Visual Studio Build Artifacts (C++ cpu_monitor)
 .vs/
 x64/
