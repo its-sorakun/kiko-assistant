@@ -1,8 +1,6 @@
-# Copyright (C) 2026 its-sorakun
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# tools/overlay.py - Native transparent on-screen GDI window overlay for hardware thermal alerts
+# Implementation details:
+# Uses layered and transparent WS_EX styles to render non-intrusive warning banners via user32.
 
 import sys
 import ctypes

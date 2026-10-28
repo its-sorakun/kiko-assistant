@@ -1,8 +1,6 @@
-// Copyright (C) 2026 its-sorakun
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// cpu_monitor/main.cpp - AMD Ryzen Ring-0 hardware temperature polling daemon
+// Implementation details:
+// Interacts with AMD Ryzen Master drivers to read CPU thermal diodes and writes to shared memory.
 
 #include <iostream>
 #include <windows.h>

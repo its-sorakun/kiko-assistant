@@ -1,8 +1,4 @@
-# Copyright (C) 2026 its-sorakun
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# tools/registry.py - Native Win32 Windows Registry reader
 
 # Direct native Win32 registry reads. Using winreg instead of powershell wrappers to keep execution fast and avoid spawning heavy subprocesses just to read a string value.
 import winreg

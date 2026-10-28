@@ -1,8 +1,6 @@
-# Copyright (C) 2026 its-sorakun
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# tools/job_application_helper.py - Cold-email orchestrator and resume evaluator
+# Implementation details:
+# Evaluates local resume PDFs using the FAISS RAG sub-agent and formats tailored job applications.
 
 import os
 from google import genai

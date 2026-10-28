@@ -1,8 +1,7 @@
-# Copyright (C) 2026 its-sorakun
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# main.py - Core execution loop and agent reasoning coordinator
+# Implementation details:
+# Coordinates Google Gemini generative model interactions, dynamic function calling schemas,
+# memory vector integration, and autonomous tool routing across native subsystems.
 
 from tools.memory import save_vector_memory
 from tools.memory import recall_semantic_memory

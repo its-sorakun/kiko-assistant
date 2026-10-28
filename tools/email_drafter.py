@@ -1,8 +1,6 @@
-# Copyright (C) 2026 its-sorakun
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# tools/email_drafter.py - Meta-instruction generator for professional email drafting
+# Implementation details:
+# Extracts resume context and drafts targeted application communications.
 
 import os
 from .pdf_rag import advanced_pdf_query

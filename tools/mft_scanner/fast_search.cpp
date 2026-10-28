@@ -1,8 +1,6 @@
-// Copyright (C) 2026 its-sorakun
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// fast_search.cpp - Low-level NTFS Master File Table (MFT) record enumerator
+// Implementation details:
+// Bypasses high-level indexing services by calling FSCTL_ENUM_USN_DATA directly on volume handles.
 
 #include <windows.h>
 #include <stdio.h>

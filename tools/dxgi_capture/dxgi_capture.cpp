@@ -1,8 +1,6 @@
-// Copyright (C) 2026 its-sorakun
-// This program is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// dxgi_capture.cpp - DXGI Desktop Duplication frame buffer capture engine
+// Implementation details:
+// Duplicates the desktop frame directly from GPU VRAM and transfers raw pixel buffers via Win32 Shared Memory.
 
 #include <windows.h>
 #include <d3d11.h>

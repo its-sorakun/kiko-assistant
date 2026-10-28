@@ -1,8 +1,4 @@
-# Copyright (C) 2026 its-sorakun
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# tools/windowing.py - DWM Z-order stack traversal and filesystem navigation
 
 # If the script runs in a terminal, the terminal inherently holds the "active" window focus. Drop down to user32.dll and crawl the Desktop Window Manager (DWM) Z-order stack downward to identify the actual underlying application.
 import ctypes

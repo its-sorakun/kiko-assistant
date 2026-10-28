@@ -1,8 +1,6 @@
-# Copyright (C) 2026 its-sorakun
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# tools/clipboard.py - Native Win32 clipboard text injection
+# Implementation details:
+# Interacts directly with kernel32 and user32 memory buffers to populate clipboard data without external binaries.
 
 import ctypes
 
