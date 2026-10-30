@@ -1,7 +1,7 @@
 # tools/__init__.py - Unified tools package aggregator and reflection interface
 
 # Aggregating the modular tools here so main.py doesn't have to change import paths. This keeps the flat API surface intact for the LLM tool schemas while separating the underlying mechanics.
-from .process import launch_program, force_kill_process
+from .process import launch_program, force_kill_process, get_process_by_port, kill_process_by_port
 from .telemetry import get_system_stats, get_hardware_details
 from .windowing import get_active_window, read_active_window_content, open_directory, list_directory_contents, open_file
 from .registry import query_registry_value
@@ -32,6 +32,8 @@ __all__ = [
     "get_hardware_details", 
     "query_registry_value", 
     "force_kill_process",
+    "get_process_by_port",
+    "kill_process_by_port",
     "read_active_window_content",
     "control_system_media",
     "manage_power_state",
