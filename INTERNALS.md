@@ -66,13 +66,16 @@ graph TD
     end
 ```
 
-## 5. Direct Process Termination
-**File:** `tools.py` -> `force_kill_process()`
+## 5. Direct Process Termination & Network Port Socket Resolution
+**File:** `tools/process.py` -> `force_kill_process()`, `get_process_by_port()`, `kill_process_by_port()`
 
 Polite application closure requests are omitted in favor of kernel-level termination signals using `taskkill /F`. Such termination forcefully removes the target process from memory, neutralizing hanging threads and unresponsive GUI prompts.
+- **Port-to-PID Resolution**: When asked to resolve or terminate an application bound to a specific network port (e.g. port 3001), Kiko inspects active local network sockets using `psutil.net_connections(kind='inet')`, falling back to raw `netstat -ano -p tcp` / `udp` output if needed.
+- **Socket and Identity Inspection**: Resolves the exact PID, executable name, and disk path of any process holding the port.
+- **Safe Kernel Termination**: Distinguishes between image names and numeric PIDs, issuing `taskkill /F /PID <pid>`. Critical system processes (PIDs 0, 4, `System`, `services.exe`, `csrss.exe`) are explicitly shielded from accidental termination to prevent operating system crashes.
 
 ## 6. Registry-Based Executable Resolution
-**File:** `tools.py` -> `launch_program()`
+**File:** `tools/process.py` -> `launch_program()`
 
 Relying on the `start` shell command triggers GUI error dialogs when an executable is missing. Executable resolution is handled manually:
 1. Native `PATH` probing occurs first.
