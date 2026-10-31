@@ -37,11 +37,8 @@ model_fallback_chain = [
     'gemini-flash-latest',
     'gemini-flash-lite-latest',
     'gemini-3.7-flash',
-    'gemini-3.1-flash-lite',
     'gemini-3-flash-preview',
-    'gemini-3.1-flash-lite-preview',
     'gemini-pro-latest',
-    'gemini-3.1-pro-preview',
     'gemma-4-26b-a4b-it',
 ]
 current_model_index = 0
@@ -84,7 +81,7 @@ If the user asks what model, LLM, or AI version you are running on, use the `get
 If I ask you to play a specific song, artist, album, or create a playlist on Spotify, use your Spotify tools. However, for simple "pause", "resume", or "skip" commands, just use your local `control_system_media` tool!
 You can also read the contents of ANY active window on my screen (like Chrome, Discord, or a code editor) using `read_active_window_content`. This tool is armed with a native C++ Direct Memory Scanner that rips raw text directly from the physical RAM. The output will be a massive, fragmented dump of raw heap strings—usernames, timestamps, and messages will appear out of order. You MUST read through this fragmented noise carefully to piece together the chat/context. Do NOT apologize or claim you can't see the chat; the text IS there, just search through the raw strings for conversational sentences! Use this if I ask you to "read what I'm looking at", "use your memory scanner", or summarize an active webpage/chat.
 If I ask you a visual question, like "what game is this", "what should I do next in this game", or "look at this picture", you MUST use the `analyze_screen` tool! This tool natively attempts to use a C++ DXGI capture to rip the frame buffer straight from the GPU. If the game uses MPO or anti-cheat that causes a black screen, the tool will automatically detect this and fallback to a slower GDI BitBlt capture. Use it whenever text scraping isn't enough and you actually need to *see* my screen!
-If the user explicitly uploads or attaches an image in their message, you will see a tag like `[ATTACHMENT: C:\path\to\image.png]` in their prompt. When you see this tag, you MUST use the `analyze_image` tool, passing the file path, to view the user's uploaded image.
+If the user explicitly uploads or attaches an image in their message, you will see a tag like `[ATTACHMENT: C:\\path\\to\\image.png]` in their prompt. When you see this tag, you MUST use the `analyze_image` tool, passing the file path, to view the user's uploaded image.
 If you ingest a massive amount of data (like a memory scanner dump) and are about to do multiple web searches or just want to prevent token quota limits, use the `clear_short_term_memory` tool to instantly wipe your context window.
 If the user asks you to read, summarize, or extract information from a PDF document, DO NOT try to read the raw file. You MUST use the `advanced_pdf_query` tool to retrieve the relevant chunks of the PDF.
 If the user asks you to draft a job application email, you must use your existing tools (like web search and pdf querying) to gather context (like company details, HR email, and deciding on the best resume). Once you have chosen the best resume, call the `draft_and_copy_job_email` tool. This tool will internally draft the perfect professional email and auto-copy it to the clipboard. Wait for its output, and then excitedly tell the user you've copied the drafted email to their clipboard!
@@ -250,7 +247,7 @@ def terminal_interceptor_thread():
                 
                 if response.text:
                     # Print locally so Kiko's terminal updates too
-                    print(f"\nKiko (Terminal Watcher): {response.text}\n> ", end="", flush=True)
+                    print(f"\nKiko (Terminal Watcher - {tools.format_model_name(model_name)}): {response.text}\nSenpai > ", end="", flush=True)
                     # Send the response back to the C++ shell's ephemeral port
                     sock.sendto(response.text.encode('utf-8'), addr)
                     
@@ -287,7 +284,7 @@ def main():
     terminal_watcher = threading.Thread(target=terminal_interceptor_thread, daemon=True)
     terminal_watcher.start()
 
-    print(f"--- Kiko is waking up! [Active Model: {model_name}] ---")
+    print(f"--- Kiko is waking up! ({tools.format_model_name(model_name)}) ---")
     print("(Type 'exit' or 'quit' to terminate)")
     
     current_time = datetime.datetime.now().strftime("%A, %Y-%m-%d %H:%M:%S")
@@ -306,7 +303,7 @@ def main():
                 if "503" in err_str or "demand" in err_str or "not found" in err_str:
                     next_index = (current_model_index + 1) % len(model_fallback_chain)
                     next_model = model_fallback_chain[next_index]
-                    print(f"   [⚠️ {model_name} failed (High Demand). Falling back to {next_model}...]")
+                    print(f"   [⚠️ {tools.format_model_name(model_name)} failed (High Demand). Falling back to {tools.format_model_name(next_model)}...]")
                     current_model_index = next_index
                     model_name = next_model
                     chat = client.chats.create(model=model_name, config=config)
@@ -318,13 +315,13 @@ def main():
     # Initialize the session context
     try:
         response = send_with_fallback(f"Kiko boots up and looks at time: {time_context} before greeting")
-        print(f"\nKiko: {response.text}")
+        print(f"\nKiko ({tools.format_model_name(model_name)}): {response.text}")
     except Exception as e:
         print(f"\n[Kiko encountered an error during boot]: {e}")
     
     while True:
         try:
-            user_input = input(f"\n[{model_name}] > ")
+            user_input = input("\nSenpai > ")
             
             # Exit the loop if the user types 'exit' or 'quit'
             if user_input.lower() in ['exit', 'quit']:
@@ -373,7 +370,7 @@ def main():
                 continue
             
             if response.text:
-                print(f"\nKiko: {response.text}")
+                print(f"\nKiko ({tools.format_model_name(model_name)}): {response.text}")
                 
                 # embed and save the interaction memory
                 interaction_log = f"User: {user_input}\nKiko: {response.text}"
