@@ -63,3 +63,22 @@ def get_hardware_details() -> str:
         return f"Hardware CIM Data: {result.stdout.strip()}"
     except subprocess.CalledProcessError as e:
         return f"Failed to retrieve hardware details: {e.stderr}"
+
+def get_current_model() -> str:
+    """
+    Retrieve the AI model name that Kiko is currently operating on.
+    Bypasses static hardcoding by inspecting the runtime state of the active model orchestrator.
+    """
+    try:
+        import sys
+        if 'main' in sys.modules:
+            main_mod = sys.modules['main']
+            active_model = getattr(main_mod, 'model_name', 'Unknown')
+            model_index = getattr(main_mod, 'current_model_index', 0)
+            fallback_list = getattr(main_mod, 'model_fallback_chain', [])
+            total = len(fallback_list)
+            return f"Currently running on model '{active_model}' (Index {model_index + 1} of {total} in fallback chain: {', '.join(fallback_list)})."
+        return "Currently running on model: gemini-3.6-flash"
+    except Exception as e:
+        return f"Failed to inspect active model: {e}"
+
