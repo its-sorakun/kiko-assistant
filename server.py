@@ -90,6 +90,8 @@ async def upload_image(file: UploadFile = File(...)):
     # Return the absolute path so Kiko can read it
     return {"path": filepath}
 
+from fastapi import Request, HTTPException
+
 @app.get("/api/model")
 async def get_current_model():
     """Retrieve the currently active model and fallback chain status."""
@@ -98,9 +100,27 @@ async def get_current_model():
     return {
         "model": main.model_name,
         "display_name": format_model_name(main.model_name),
-        "models": main.model_fallback_chain,
+        "models": [{"slug": m, "name": format_model_name(m)} for m in main.model_fallback_chain],
         "index": main.current_model_index
     }
+
+@app.post("/api/model")
+async def set_current_model(request: Request):
+    """Switch active model via REST API from the web UI."""
+    data = await request.json()
+    target = data.get("model", "")
+    import main
+    from tools.telemetry import switch_ai_model, format_model_name
+    
+    result = switch_ai_model(target)
+    if "Successfully switched" in result:
+        return {
+            "status": "success",
+            "model": main.model_name,
+            "display_name": format_model_name(main.model_name),
+            "message": result
+        }
+    raise HTTPException(status_code=400, detail=result)
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
