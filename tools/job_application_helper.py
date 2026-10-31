@@ -41,11 +41,30 @@ Rules:
             return "Failed to draft email: GEMINI_API_KEY is not set in the environment."
             
         client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model='gemini-3.5-flash-lite',
-            contents=prompt
-        )
-        
+        models_to_try = [
+            'gemini-3.6-flash',
+            'gemini-3.8-flash',
+            'gemini-flash-latest',
+            'gemini-flash-lite-latest',
+            'gemini-3.7-flash',
+            'gemini-3-flash-preview',
+            'gemini-pro-latest',
+            'gemma-4-26b-a4b-it',
+        ]
+        response = None
+        for m in models_to_try:
+            try:
+                response = client.models.generate_content(
+                    model=m,
+                    contents=prompt
+                )
+                break
+            except Exception:
+                continue
+                
+        if not response:
+            return "Failed to draft email: All generative models are currently unavailable."
+            
         drafted_email = response.text.strip()
         
         # 4. Copy to clipboard
