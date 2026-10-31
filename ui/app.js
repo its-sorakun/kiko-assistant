@@ -227,6 +227,25 @@ async function loadChat(sessionId, title) {
     connectWebSocket(sessionId);
 }
 
+function updateModelIndicator(modelName) {
+    const modelSpan = document.getElementById('current-model-name');
+    if (modelSpan && modelName) {
+        modelSpan.innerText = modelName;
+    }
+}
+
+async function fetchCurrentModel() {
+    try {
+        const res = await fetch('/api/model');
+        const data = await res.json();
+        if (data && data.model) {
+            updateModelIndicator(data.model);
+        }
+    } catch (e) {
+        console.error('Error fetching current model:', e);
+    }
+}
+
 function connectWebSocket(sessionId) {
     if (ws) ws.close();
     ws = new WebSocket(`ws://${window.location.host}/ws/${sessionId}`);
@@ -238,7 +257,9 @@ function connectWebSocket(sessionId) {
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
 
-        if (data.type === 'tool_execution') {
+        if (data.type === 'model_info') {
+            updateModelIndicator(data.model);
+        } else if (data.type === 'tool_execution') {
             if (data.status === 'running') {
                 toolBlockDiv = appendToolExecution(data.tool, data.args);
             } else if (data.status === 'completed' && toolBlockDiv) {
@@ -595,3 +616,4 @@ chatInput.onkeydown = (e) => {
 newChatBtn.onclick = createSession;
 
 loadSessions();
+fetchCurrentModel();
