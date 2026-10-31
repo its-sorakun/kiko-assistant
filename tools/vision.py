@@ -78,11 +78,8 @@ def analyze_screen(prompt: str) -> str:
             'gemini-flash-latest',
             'gemini-flash-lite-latest',
             'gemini-3.7-flash',
-            'gemini-3.1-flash-lite',
             'gemini-3-flash-preview',
-            'gemini-3.1-flash-lite-preview',
             'gemini-pro-latest',
-            'gemini-3.1-pro-preview',
         ]
         response = None
         
@@ -124,11 +121,8 @@ def analyze_image(image_path: str, prompt: str) -> str:
             'gemini-flash-latest',
             'gemini-flash-lite-latest',
             'gemini-3.7-flash',
-            'gemini-3.1-flash-lite',
             'gemini-3-flash-preview',
-            'gemini-3.1-flash-lite-preview',
             'gemini-pro-latest',
-            'gemini-3.1-pro-preview',
         ]
         response = None
         
