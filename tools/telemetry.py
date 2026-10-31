@@ -102,3 +102,104 @@ def get_current_model() -> str:
     except Exception as e:
         return f"Failed to inspect active model: {e}"
 
+def list_available_models() -> str:
+    """
+    List all supported AI models that Kiko has access to switch between.
+    Call this whenever the user asks what models are available or what models Kiko can use.
+    """
+    try:
+        import sys
+        fallback_list = []
+        active_model = ""
+        if 'main' in sys.modules:
+            main_mod = sys.modules['main']
+            fallback_list = getattr(main_mod, 'model_fallback_chain', [])
+            active_model = getattr(main_mod, 'model_name', '')
+            
+        if not fallback_list:
+            fallback_list = [
+                'gemini-3.6-flash',
+                'gemini-3.8-flash',
+                'gemini-flash-latest',
+                'gemini-flash-lite-latest',
+                'gemini-3.7-flash',
+                'gemini-3-flash-preview',
+                'gemini-pro-latest',
+                'gemma-4-26b-a4b-it'
+            ]
+            
+        lines = ["Available AI Models:"]
+        for idx, m in enumerate(fallback_list, 1):
+            title = format_model_name(m)
+            status = " [ACTIVE]" if m == active_model else ""
+            lines.append(f"{idx}. {title} (`{m}`){status}")
+            
+        return "\n".join(lines)
+    except Exception as e:
+        return f"Failed to list models: {e}"
+
+def switch_ai_model(target_model: str) -> str:
+    """
+    Switch Kiko's active AI model to a specified available model from her verified list.
+    Fuzzy-matches input strings against permitted models to prevent 404/quota errors.
+    Recreates the active chat session with existing history preserved to prevent context loss.
+    """
+    try:
+        import sys
+        if 'main' not in sys.modules:
+            return "Cannot switch models: Core orchestrator module is not loaded."
+            
+        main_mod = sys.modules['main']
+        allowed_models = getattr(main_mod, 'model_fallback_chain', [])
+        
+        query = target_model.strip().lower()
+        matched = None
+        matched_idx = -1
+        
+        # Exact slug match first
+        for idx, m in enumerate(allowed_models):
+            if m.lower() == query:
+                matched = m
+                matched_idx = idx
+                break
+                
+        # Fuzzy matching against slug or formatted title
+        if not matched:
+            cleaned_query = query.replace("gemini", "").replace("-", " ").strip()
+            for idx, m in enumerate(allowed_models):
+                formatted = format_model_name(m).lower()
+                cleaned_m = m.replace("gemini", "").replace("-", " ").strip()
+                if query in m.lower() or query in formatted or (cleaned_query and cleaned_query in cleaned_m):
+                    matched = m
+                    matched_idx = idx
+                    break
+                    
+        if not matched:
+            allowed_str = ", ".join(f"`{m}` ({format_model_name(m)})" for m in allowed_models)
+            return f"Model '{target_model}' is not in the allowed list to avoid 404/quota errors. Allowed models are: {allowed_str}"
+            
+        # Update runtime model state
+        main_mod.model_name = matched
+        main_mod.current_model_index = matched_idx
+        
+        # If terminal chat instance exists, preserve conversation history across the engine swap
+        if hasattr(main_mod, 'chat') and main_mod.chat:
+            try:
+                history = main_mod.chat.get_history()
+                main_mod.chat = main_mod.client.chats.create(
+                    model=matched,
+                    config=main_mod.config,
+                    history=history
+                )
+            except Exception:
+                # If history extraction fails, recreate clean session with identical config
+                main_mod.chat = main_mod.client.chats.create(
+                    model=matched,
+                    config=main_mod.config
+                )
+                
+        display = format_model_name(matched)
+        return f"Successfully switched active AI engine to {display} (`{matched}`)."
+    except Exception as e:
+        return f"Failed to switch AI model: {e}"
+
