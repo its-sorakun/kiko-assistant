@@ -70,13 +70,32 @@ def format_model_name(model_slug: str) -> str:
     Maps canonical Gemini and Gemma model names while providing title-case transformation fallback.
     """
     mapping = {
-        'gemini-3.6-flash': 'Gemini 3.6 Flash',
+        # Gemini 3 - Official Models
         'gemini-3.8-flash': 'Gemini 3.8 Flash',
+        'gemini-3.8-live': 'Gemini 3.8 Live',
+        'gemini-3.8-live-extended-thinking': 'Gemini 3.8 Live Extended Thinking',
+        'gemini-3.8-flash-tts': 'Gemini 3.8 Flash TTS',
+        'gemini-3.8-flash-lite-tts': 'Gemini 3.8 Flash-Lite TTS',
+        'gemini-3.6-flash': 'Gemini 3.6 Flash',
+        'gemini-3.5-flash-lite': 'Gemini 3.5 Flash-Lite',
+        'gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite',
+        'gemini-nano-banana-2.1': 'Nano Banana 2.1',
+        'gemini-3.1-flash-image': 'Nano Banana 2',
+        'gemini-3.1-flash-lite-image': 'Nano Banana 2 Lite',
+        'gemini-3-pro-image': 'Nano Banana Pro',
+        'gemini-3.5-transcribe': 'Gemini 3.5 Transcribe',
+        'gemini-3.5-transcribe-live': 'Gemini 3.5 Transcribe Live',
+        'gemini-omni-1.1-flash': 'Gemini Omni Flash',
+        'gemini-3.1-pro-preview': 'Gemini 3.1 Pro Preview',
+        'gemini-3-flash-preview': 'Gemini 3 Flash Preview',
+        'gemini-3.5-live-translate-preview': 'Gemini 3.5 Live Translate',
+        'gemini-3.1-flash-live-preview': 'Gemini 3.1 Flash Live Preview',
+        'gemini-3.1-flash-tts-preview': 'Gemini 3.1 Flash TTS Preview',
+        # Dynamic Gemini Aliases and Other Generations
         'gemini-flash-latest': 'Gemini Flash Latest',
         'gemini-flash-lite-latest': 'Gemini Flash Lite',
-        'gemini-3.7-flash': 'Gemini 3.7 Flash',
-        'gemini-3-flash-preview': 'Gemini 3 Flash Preview',
         'gemini-pro-latest': 'Gemini Pro Latest',
+        'gemini-4-argon': 'Gemini 4 Argon',
         'gemma-4-26b-a4b-it': 'Gemma 4 26B',
     }
     if model_slug in mapping:
@@ -120,12 +139,20 @@ def list_available_models() -> str:
             fallback_list = [
                 'gemini-3.6-flash',
                 'gemini-3.8-flash',
+                'gemini-3.5-flash-lite',
+                'gemini-3.1-flash-lite',
+                'gemini-3-flash-preview',
+                'gemini-3.1-pro-preview',
+                'gemini-nano-banana-2.1',
+                'gemini-3.1-flash-image',
+                'gemini-3.1-flash-lite-image',
+                'gemini-3-pro-image',
+                'gemini-omni-1.1-flash',
                 'gemini-flash-latest',
                 'gemini-flash-lite-latest',
-                'gemini-3.7-flash',
-                'gemini-3-flash-preview',
                 'gemini-pro-latest',
-                'gemma-4-26b-a4b-it'
+                'gemini-4-argon',
+                'gemma-4-26b-a4b-it',
             ]
             
         lines = ["Available AI Models:"]
@@ -153,9 +180,24 @@ def switch_ai_model(target_model: str) -> str:
         allowed_models = getattr(main_mod, 'model_fallback_chain', [])
         
         query = target_model.strip().lower()
-        matched = None
-        matched_idx = -1
-        
+        # Check specialized models first
+        specialized_models = {
+            'gemini-3.8-live': 'real-time bidirectional Live API (WebSockets)',
+            'gemini-3.8-live-extended-thinking': 'real-time bidirectional Live API with thinking',
+            'gemini-3.5-live-translate-preview': 'real-time speech translation',
+            'gemini-3.1-flash-live-preview': 'real-time Live API preview',
+            'gemini-3.8-flash-tts': 'direct audio text-to-speech generation',
+            'gemini-3.8-flash-lite-tts': 'fast audio text-to-speech generation',
+            'gemini-3.1-flash-tts-preview': 'audio text-to-speech generation',
+            'gemini-3.5-transcribe': 'audio speech-to-text transcription',
+            'gemini-3.5-transcribe-live': 'real-time speech transcription',
+        }
+        cleaned_query = query.replace("gemini", "").replace("-", " ").strip()
+        for spec_slug, purpose in specialized_models.items():
+            cleaned_spec = spec_slug.replace("gemini", "").replace("-", " ").strip()
+            if spec_slug == query or (cleaned_query and cleaned_query in cleaned_spec):
+                return f"Model '{spec_slug}' ({format_model_name(spec_slug)}) is specifically dedicated to {purpose} and does not support standard conversational tool-calling. Please choose a conversational Gemini 3 model like Gemini 3.8 Flash, Gemini 3.6 Flash, or Gemini 3.5 Flash-Lite."
+
         # Exact slug match first
         for idx, m in enumerate(allowed_models):
             if m.lower() == query:
@@ -165,7 +207,6 @@ def switch_ai_model(target_model: str) -> str:
                 
         # Fuzzy matching against slug or formatted title
         if not matched:
-            cleaned_query = query.replace("gemini", "").replace("-", " ").strip()
             for idx, m in enumerate(allowed_models):
                 formatted = format_model_name(m).lower()
                 cleaned_m = m.replace("gemini", "").replace("-", " ").strip()
