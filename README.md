@@ -39,7 +39,7 @@ Because Kiko is hooked directly into the OS rather than relying on clunky GUI au
 
 ## How It Works (The Reasoning Engine)
 
-At her core, Kiko is powered by the `google.genai` SDK, primarily relying on the Gemini 3.5 Flash Lite model for blazing-fast inference, with other models configured as fallbacks.
+At her core, Kiko is powered by the `google.genai` SDK, primarily relying on the Gemini 3.6 Flash model for blazing-fast inference, with other models configured as fallbacks.
 
 She entirely ditches the legacy assistant architecture of hardcoded `if/else` intent routing and regex string matching. Instead, she operates as a fully autonomous agentic loop:
 
@@ -68,6 +68,7 @@ She entirely ditches the legacy assistant architecture of hardcoded `if/else` in
 - **Native Win32 Clipboard**: Enables Kiko to seamlessly push text payloads directly into the host OS clipboard utilizing `kernel32` and `user32` ctypes bindings, bypassing the need for external CLI binaries.
 - **Agentic Job Application Helper**: A dedicated orchestration workflow that fully automates job applications. When given a target HR email (either provided directly in chat or autonomously extracted from a target document), Kiko deduces the company name, performs a live web search for company details, and evaluates available resumes to select the best fit(If multiple resumes exists, it will select the best fit based on the job description and your field). She then passes the data to an isolated helper tool that drafts a strictly professional email (bypassing her persona) and natively injects the final draft directly into the clipboard.
 - **Dynamic Hot-Swapping**: Kiko's tools architecture dynamically resolves function pointers straight from module exports at runtime. Kiko is equipped with a `reload_core_systems` tool, allowing her to natively trigger Python's `importlib.reload()` on all her internal subsystems and rebuild her Gemini API schema dynamically without dropping the chat session loop, enabling live code editing.
+- **Real-Time Model Visibility & Fallback Tracking**: Continuously monitors and exposes Kiko's active AI model state across both the interactive Terminal and the WebUI. In the terminal, the active model is embedded into the boot sequence and the interactive prompt (`[model-name] >`). In the WebUI, a reactive model pill dynamically updates in real-time over WebSockets whenever demand spikes trigger Kiko's automated multi-model fallback chain.
 
 ## Configuration & Usage
 
