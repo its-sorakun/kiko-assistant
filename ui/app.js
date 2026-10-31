@@ -228,6 +228,8 @@ async function loadChat(sessionId, title) {
 }
 
 let activeModelDisplayName = 'Gemini 3.6 Flash';
+let currentModelSlug = 'gemini-3.6-flash';
+let availableModelsList = [];
 
 function formatModelName(slug) {
     if (!slug) return 'Gemini 3.6 Flash';
@@ -248,9 +250,74 @@ function formatModelName(slug) {
 function updateModelIndicator(modelName, displayName) {
     const label = displayName || formatModelName(modelName);
     activeModelDisplayName = label;
+    currentModelSlug = modelName;
     const modelSpan = document.getElementById('current-model-name');
     if (modelSpan && label) {
         modelSpan.innerText = label;
+    }
+    if (availableModelsList.length > 0) {
+        renderModelDropdown(availableModelsList, currentModelSlug);
+    }
+}
+
+function renderModelDropdown(models, activeSlug) {
+    const container = document.getElementById('model-list-container');
+    if (!container || !models) return;
+    container.innerHTML = '';
+
+    models.forEach(m => {
+        const itemBtn = document.createElement('button');
+        const isActive = m.slug === activeSlug;
+        itemBtn.className = `w-full text-left px-3 py-1.5 rounded-xl text-xs flex items-center justify-between transition-colors ${
+            isActive 
+                ? 'bg-cozy-accent/15 dark:bg-cozy-accent/20 text-cozy-accent dark:text-emerald-400 font-bold' 
+                : 'text-cozy-text dark:text-cozy-darkText hover:bg-cozy-sidebar dark:hover:bg-cozy-darkBorder/60'
+        }`;
+        itemBtn.innerHTML = `
+            <div class="flex flex-col">
+                <span class="font-sans font-medium text-[12px] leading-tight">${m.name}</span>
+                <span class="font-mono text-[9.5px] opacity-60">${m.slug}</span>
+            </div>
+            ${isActive ? '<span class="text-xs text-cozy-accent dark:text-emerald-400">✓</span>' : ''}
+        `;
+        itemBtn.onclick = (e) => {
+            e.stopPropagation();
+            switchModel(m.slug);
+            toggleModelDropdown(false);
+        };
+        container.appendChild(itemBtn);
+    });
+}
+
+function toggleModelDropdown(forceState) {
+    const dropdown = document.getElementById('model-dropdown');
+    const arrow = document.getElementById('model-dropdown-arrow');
+    if (!dropdown) return;
+    const shouldOpen = typeof forceState === 'boolean' ? forceState : dropdown.classList.contains('hidden');
+    if (shouldOpen) {
+        dropdown.classList.remove('hidden');
+        if (arrow) arrow.classList.add('rotate-180');
+    } else {
+        dropdown.classList.add('hidden');
+        if (arrow) arrow.classList.remove('rotate-180');
+    }
+}
+
+async function switchModel(targetSlug) {
+    try {
+        const res = await fetch('/api/model', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: targetSlug })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            updateModelIndicator(data.model, data.display_name);
+        } else {
+            console.error('Failed to switch model:', data.detail || data.message);
+        }
+    } catch (e) {
+        console.error('Error switching model:', e);
     }
 }
 
@@ -259,12 +326,30 @@ async function fetchCurrentModel() {
         const res = await fetch('/api/model');
         const data = await res.json();
         if (data) {
+            currentModelSlug = data.model;
+            availableModelsList = data.models || [];
             updateModelIndicator(data.model, data.display_name);
+            renderModelDropdown(availableModelsList, currentModelSlug);
         }
     } catch (e) {
         console.error('Error fetching current model:', e);
     }
 }
+
+const modelBadgeBtn = document.getElementById('model-badge');
+if (modelBadgeBtn) {
+    modelBadgeBtn.onclick = (e) => {
+        e.stopPropagation();
+        toggleModelDropdown();
+    };
+}
+
+document.addEventListener('click', (e) => {
+    const dropdown = document.getElementById('model-dropdown');
+    if (dropdown && !dropdown.classList.contains('hidden') && !dropdown.contains(e.target)) {
+        toggleModelDropdown(false);
+    }
+});
 
 function connectWebSocket(sessionId) {
     if (ws) ws.close();
