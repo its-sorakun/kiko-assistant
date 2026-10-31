@@ -234,13 +234,32 @@ let availableModelsList = [];
 function formatModelName(slug) {
     if (!slug) return 'Gemini 3.6 Flash';
     const mapping = {
-        'gemini-3.6-flash': 'Gemini 3.6 Flash',
+        // Gemini 3 - Official Models
         'gemini-3.8-flash': 'Gemini 3.8 Flash',
+        'gemini-3.8-live': 'Gemini 3.8 Live',
+        'gemini-3.8-live-extended-thinking': 'Gemini 3.8 Live Extended Thinking',
+        'gemini-3.8-flash-tts': 'Gemini 3.8 Flash TTS',
+        'gemini-3.8-flash-lite-tts': 'Gemini 3.8 Flash-Lite TTS',
+        'gemini-3.6-flash': 'Gemini 3.6 Flash',
+        'gemini-3.5-flash-lite': 'Gemini 3.5 Flash-Lite',
+        'gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite',
+        'gemini-nano-banana-2.1': 'Nano Banana 2.1',
+        'gemini-3.1-flash-image': 'Nano Banana 2',
+        'gemini-3.1-flash-lite-image': 'Nano Banana 2 Lite',
+        'gemini-3-pro-image': 'Nano Banana Pro',
+        'gemini-3.5-transcribe': 'Gemini 3.5 Transcribe',
+        'gemini-3.5-transcribe-live': 'Gemini 3.5 Transcribe Live',
+        'gemini-omni-1.1-flash': 'Gemini Omni Flash',
+        'gemini-3.1-pro-preview': 'Gemini 3.1 Pro Preview',
+        'gemini-3-flash-preview': 'Gemini 3 Flash Preview',
+        'gemini-3.5-live-translate-preview': 'Gemini 3.5 Live Translate',
+        'gemini-3.1-flash-live-preview': 'Gemini 3.1 Flash Live Preview',
+        'gemini-3.1-flash-tts-preview': 'Gemini 3.1 Flash TTS Preview',
+        // Dynamic Gemini Aliases and Other Generations
         'gemini-flash-latest': 'Gemini Flash Latest',
         'gemini-flash-lite-latest': 'Gemini Flash Lite',
-        'gemini-3.7-flash': 'Gemini 3.7 Flash',
-        'gemini-3-flash-preview': 'Gemini 3 Flash Preview',
         'gemini-pro-latest': 'Gemini Pro Latest',
+        'gemini-4-argon': 'Gemini 4 Argon',
         'gemma-4-26b-a4b-it': 'Gemma 4 26B',
     };
     if (mapping[slug]) return mapping[slug];
@@ -314,7 +333,9 @@ async function switchModel(targetSlug) {
         if (res.ok && data.status === 'success') {
             updateModelIndicator(data.model, data.display_name);
         } else {
-            console.error('Failed to switch model:', data.detail || data.message);
+            const err = data.detail || data.message || 'Failed to switch model';
+            console.error('Failed to switch model:', err);
+            alert(err);
         }
     } catch (e) {
         console.error('Error switching model:', e);
