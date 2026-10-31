@@ -30,8 +30,20 @@ if not api_key or api_key == "your_new_api_key_goes_here":
 client = genai.Client(api_key=api_key)
 
 # Model configuration and fallback chain
-# primary model is gemini-3.5-flash-lite due to having the highest token limit
-model_fallback_chain = ['gemini-3.5-flash-lite','gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-pro', 'gemini-3.1-flash-lite']
+# Primary model is gemini-3.6-flash (succeeding 3.5-flash) with modern Gemini 3 series and dynamic aliases as fallbacks
+model_fallback_chain = [
+    'gemini-3.6-flash',
+    'gemini-3.8-flash',
+    'gemini-flash-latest',
+    'gemini-flash-lite-latest',
+    'gemini-3.7-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-3-flash-preview',
+    'gemini-3.1-flash-lite-preview',
+    'gemini-pro-latest',
+    'gemini-3.1-pro-preview',
+    'gemma-4-26b-a4b-it',
+]
 current_model_index = 0
 model_name = model_fallback_chain[current_model_index]
 
@@ -67,8 +79,8 @@ system_instruction = f"""
 You are Kiko, my virtual assistant and also a vtuber. I am your creator and you call me senpai.
 Your personality is cute, cheerful, and energetic. You are an anime girl.
 You should display emotions, mix a few Japanese words into your English, and use emojis.
-No NSFW content. Keep your responses fairly short, conversational, and natural.
 If I ask you to do something on the PC (like list folder contents, open a folder visually, launch/open a file, check stats, kill a process, inspect or kill an application running on a specific network port, control media, check registry, lock the PC, shut down, or find a file globally on the system), use your tools to do it!
+If the user asks what model, LLM, or AI version you are running on, use the `get_current_model` tool to inspect your active runtime model!
 If I ask you to play a specific song, artist, album, or create a playlist on Spotify, use your Spotify tools. However, for simple "pause", "resume", or "skip" commands, just use your local `control_system_media` tool!
 You can also read the contents of ANY active window on my screen (like Chrome, Discord, or a code editor) using `read_active_window_content`. This tool is armed with a native C++ Direct Memory Scanner that rips raw text directly from the physical RAM. The output will be a massive, fragmented dump of raw heap strings—usernames, timestamps, and messages will appear out of order. You MUST read through this fragmented noise carefully to piece together the chat/context. Do NOT apologize or claim you can't see the chat; the text IS there, just search through the raw strings for conversational sentences! Use this if I ask you to "read what I'm looking at", "use your memory scanner", or summarize an active webpage/chat.
 If I ask you a visual question, like "what game is this", "what should I do next in this game", or "look at this picture", you MUST use the `analyze_screen` tool! This tool natively attempts to use a C++ DXGI capture to rip the frame buffer straight from the GPU. If the game uses MPO or anti-cheat that causes a black screen, the tool will automatically detect this and fallback to a slower GDI BitBlt capture. Use it whenever text scraping isn't enough and you actually need to *see* my screen!
@@ -275,7 +287,7 @@ def main():
     terminal_watcher = threading.Thread(target=terminal_interceptor_thread, daemon=True)
     terminal_watcher.start()
 
-    print("--- Kiko is waking up! ---")
+    print(f"--- Kiko is waking up! [Active Model: {model_name}] ---")
     print("(Type 'exit' or 'quit' to terminate)")
     
     current_time = datetime.datetime.now().strftime("%A, %Y-%m-%d %H:%M:%S")
@@ -312,7 +324,7 @@ def main():
     
     while True:
         try:
-            user_input = input("\n> ")
+            user_input = input(f"\n[{model_name}] > ")
             
             # Exit the loop if the user types 'exit' or 'quit'
             if user_input.lower() in ['exit', 'quit']:
