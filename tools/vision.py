@@ -75,10 +75,17 @@ def analyze_screen(prompt: str) -> str:
         fallback_chain = [
             'gemini-3.6-flash',
             'gemini-3.8-flash',
+            'gemini-3.5-flash-lite',
+            'gemini-3.1-flash-lite',
+            'gemini-3-flash-preview',
+            'gemini-3.1-pro-preview',
+            'gemini-nano-banana-2.1',
+            'gemini-3.1-flash-image',
+            'gemini-3.1-flash-lite-image',
+            'gemini-3-pro-image',
+            'gemini-omni-1.1-flash',
             'gemini-flash-latest',
             'gemini-flash-lite-latest',
-            'gemini-3.7-flash',
-            'gemini-3-flash-preview',
             'gemini-pro-latest',
         ]
         response = None
@@ -90,7 +97,7 @@ def analyze_screen(prompt: str) -> str:
                 break # Success
             except Exception as e:
                 err_str = str(e).lower()
-                if "503" in err_str or "demand" in err_str or "not found" in err_str:
+                if "503" in err_str or "demand" in err_str or "not found" in err_str or "quota" in err_str or "429" in err_str:
                     print(f"   [⚠️ {m} failed (High Demand/Unavailable). Falling back...]")
                     continue
                 else:
@@ -118,10 +125,17 @@ def analyze_image(image_path: str, prompt: str) -> str:
         fallback_chain = [
             'gemini-3.6-flash',
             'gemini-3.8-flash',
+            'gemini-3.5-flash-lite',
+            'gemini-3.1-flash-lite',
+            'gemini-3-flash-preview',
+            'gemini-3.1-pro-preview',
+            'gemini-nano-banana-2.1',
+            'gemini-3.1-flash-image',
+            'gemini-3.1-flash-lite-image',
+            'gemini-3-pro-image',
+            'gemini-omni-1.1-flash',
             'gemini-flash-latest',
             'gemini-flash-lite-latest',
-            'gemini-3.7-flash',
-            'gemini-3-flash-preview',
             'gemini-pro-latest',
         ]
         response = None
@@ -133,7 +147,7 @@ def analyze_image(image_path: str, prompt: str) -> str:
                 break # Success
             except Exception as e:
                 err_str = str(e).lower()
-                if "503" in err_str or "demand" in err_str or "not found" in err_str:
+                if "503" in err_str or "demand" in err_str or "not found" in err_str or "quota" in err_str or "429" in err_str:
                     print(f"   [⚠️ {m} failed (High Demand/Unavailable) in analyze_image. Falling back...]")
                     continue
                 else:
