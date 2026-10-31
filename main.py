@@ -30,15 +30,23 @@ if not api_key or api_key == "your_new_api_key_goes_here":
 client = genai.Client(api_key=api_key)
 
 # Model configuration and fallback chain
-# Primary model is gemini-3.6-flash (succeeding 3.5-flash) with modern Gemini 3 series and dynamic aliases as fallbacks
+# Primary model is gemini-3.6-flash with official Gemini 3 series and dynamic aliases as fallbacks
 model_fallback_chain = [
     'gemini-3.6-flash',
     'gemini-3.8-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.1-flash-lite',
+    'gemini-3-flash-preview',
+    'gemini-3.1-pro-preview',
+    'gemini-nano-banana-2.1',
+    'gemini-3.1-flash-image',
+    'gemini-3.1-flash-lite-image',
+    'gemini-3-pro-image',
+    'gemini-omni-1.1-flash',
     'gemini-flash-latest',
     'gemini-flash-lite-latest',
-    'gemini-3.7-flash',
-    'gemini-3-flash-preview',
     'gemini-pro-latest',
+    'gemini-4-argon',
     'gemma-4-26b-a4b-it',
 ]
 current_model_index = 0
@@ -300,7 +308,7 @@ def main():
                 return resp
             except Exception as e:
                 err_str = str(e).lower()
-                if "503" in err_str or "demand" in err_str or "not found" in err_str:
+                if "503" in err_str or "demand" in err_str or "not found" in err_str or "quota" in err_str or "429" in err_str or "resource_exhausted" in err_str:
                     next_index = (current_model_index + 1) % len(model_fallback_chain)
                     next_model = model_fallback_chain[next_index]
                     print(f"   [⚠️ {tools.format_model_name(model_name)} failed (High Demand). Falling back to {tools.format_model_name(next_model)}...]")
