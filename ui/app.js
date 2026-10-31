@@ -227,10 +227,30 @@ async function loadChat(sessionId, title) {
     connectWebSocket(sessionId);
 }
 
-function updateModelIndicator(modelName) {
+let activeModelDisplayName = 'Gemini 3.6 Flash';
+
+function formatModelName(slug) {
+    if (!slug) return 'Gemini 3.6 Flash';
+    const mapping = {
+        'gemini-3.6-flash': 'Gemini 3.6 Flash',
+        'gemini-3.8-flash': 'Gemini 3.8 Flash',
+        'gemini-flash-latest': 'Gemini Flash Latest',
+        'gemini-flash-lite-latest': 'Gemini Flash Lite',
+        'gemini-3.7-flash': 'Gemini 3.7 Flash',
+        'gemini-3-flash-preview': 'Gemini 3 Flash Preview',
+        'gemini-pro-latest': 'Gemini Pro Latest',
+        'gemma-4-26b-a4b-it': 'Gemma 4 26B',
+    };
+    if (mapping[slug]) return mapping[slug];
+    return slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function updateModelIndicator(modelName, displayName) {
+    const label = displayName || formatModelName(modelName);
+    activeModelDisplayName = label;
     const modelSpan = document.getElementById('current-model-name');
-    if (modelSpan && modelName) {
-        modelSpan.innerText = modelName;
+    if (modelSpan && label) {
+        modelSpan.innerText = label;
     }
 }
 
@@ -238,8 +258,8 @@ async function fetchCurrentModel() {
     try {
         const res = await fetch('/api/model');
         const data = await res.json();
-        if (data && data.model) {
-            updateModelIndicator(data.model);
+        if (data) {
+            updateModelIndicator(data.model, data.display_name);
         }
     } catch (e) {
         console.error('Error fetching current model:', e);
@@ -258,7 +278,7 @@ function connectWebSocket(sessionId) {
         const data = JSON.parse(event.data);
 
         if (data.type === 'model_info') {
-            updateModelIndicator(data.model);
+            updateModelIndicator(data.model, data.display_name);
         } else if (data.type === 'tool_execution') {
             if (data.status === 'running') {
                 toolBlockDiv = appendToolExecution(data.tool, data.args);
@@ -305,6 +325,9 @@ function createMessageDiv(role) {
 
     if (isUser) {
         bubble.className = 'max-w-[75%] bg-white dark:bg-cozy-darkBubble border-2 border-cozy-border dark:border-cozy-darkBorder text-cozy-text dark:text-cozy-darkText px-6 py-4 rounded-[28px] rounded-br-[8px] text-[15.5px] leading-relaxed shadow-sm font-medium';
+        const content = document.createElement('div');
+        content.className = 'prose flex-1';
+        bubble.appendChild(content);
     } else {
         bubble.className = 'w-full flex gap-4 text-cozy-text dark:text-cozy-darkText text-[15.5px] leading-relaxed font-medium relative';
 
@@ -315,11 +338,21 @@ function createMessageDiv(role) {
             <span class="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-cozy-terracotta border-2 border-cozy-bg dark:border-cozy-darkBg rounded-full"></span>
         `;
         bubble.appendChild(avatar);
-    }
 
-    const content = document.createElement('div');
-    content.className = 'prose flex-1 pt-1';
-    bubble.appendChild(content);
+        const messageContainer = document.createElement('div');
+        messageContainer.className = 'flex-1 flex flex-col min-w-0';
+
+        const header = document.createElement('div');
+        header.className = 'text-[12px] font-sans font-semibold text-cozy-muted dark:text-gray-400 mb-0.5 flex items-center gap-1.5 select-none';
+        header.innerHTML = `<span>Kiko</span><span class="text-[10px] font-mono text-cozy-accent dark:text-emerald-400 font-medium">(${activeModelDisplayName})</span>`;
+        messageContainer.appendChild(header);
+
+        const content = document.createElement('div');
+        content.className = 'prose flex-1 pt-0.5';
+        messageContainer.appendChild(content);
+
+        bubble.appendChild(messageContainer);
+    }
 
     wrapper.appendChild(bubble);
     return wrapper;
