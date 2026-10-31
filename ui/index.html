@@ -244,10 +244,21 @@
             <div class="w-1/4"></div>
             <h1 id="current-session-title" class="text-[13px] font-serif italic text-cozy-muted dark:text-gray-400 text-center flex-1 truncate">
             </h1>
-            <div class="w-1/4 flex justify-end pointer-events-auto">
-                <div id="model-badge" class="flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 dark:bg-cozy-darkBubble/80 backdrop-blur-sm border border-cozy-border dark:border-cozy-darkBorder text-xs text-cozy-text dark:text-cozy-darkText shadow-sm transition-all" title="Current Active AI Model">
+            <div class="w-1/4 flex justify-end pointer-events-auto relative">
+                <button id="model-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 dark:bg-cozy-darkBubble/80 hover:bg-white dark:hover:bg-cozy-darkBubble backdrop-blur-sm border border-cozy-border dark:border-cozy-darkBorder text-xs text-cozy-text dark:text-cozy-darkText shadow-sm transition-all cursor-pointer group" title="Click to switch AI Model">
                     <span id="model-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span id="current-model-name" class="font-sans text-[11px] font-semibold text-cozy-accent dark:text-emerald-400">Gemini 3.6 Flash</span>
+                    <svg class="w-3 h-3 text-cozy-muted group-hover:text-cozy-text dark:group-hover:text-cozy-darkText transition-transform duration-200" id="model-dropdown-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                </button>
+
+                <!-- Model Selection Dropdown Menu -->
+                <div id="model-dropdown" class="hidden absolute top-10 right-0 w-64 py-2 bg-white/95 dark:bg-cozy-darkBubble/95 backdrop-blur-md border border-cozy-border dark:border-cozy-darkBorder rounded-2xl shadow-xl z-50 transition-all flex flex-col gap-1">
+                    <div class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-cozy-muted dark:text-gray-400 border-b border-cozy-border/50 dark:border-cozy-darkBorder/50 mb-1">
+                        Select AI Engine
+                    </div>
+                    <div id="model-list-container" class="flex flex-col gap-0.5 max-h-72 overflow-y-auto px-1">
+                        <!-- Populated dynamically via JS -->
+                    </div>
                 </div>
             </div>
         </header>
