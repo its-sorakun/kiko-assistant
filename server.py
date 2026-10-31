@@ -90,9 +90,25 @@ async def upload_image(file: UploadFile = File(...)):
     # Return the absolute path so Kiko can read it
     return {"path": filepath}
 
+@app.get("/api/model")
+async def get_current_model():
+    """Retrieve the currently active model and fallback chain status."""
+    import main
+    return {
+        "model": main.model_name,
+        "models": main.model_fallback_chain,
+        "index": main.current_model_index
+    }
+
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
     await websocket.accept()
+    import main
+    # Send current model info to frontend immediately upon connection
+    await websocket.send_json({
+        "type": "model_info",
+        "model": main.model_name
+    })
     try:
         while True:
             # Receive message from frontend
@@ -221,6 +237,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                             
                             main.current_model_index = next_index
                             main.model_name = next_model
+                            
+                            # Update UI model indicator on fallback
+                            await websocket.send_json({
+                                "type": "model_info",
+                                "model": next_model
+                            })
                             
                             # Clear current thinking/fallback status
                             await websocket.send_json({
