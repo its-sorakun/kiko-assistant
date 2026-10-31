@@ -64,6 +64,25 @@ def get_hardware_details() -> str:
     except subprocess.CalledProcessError as e:
         return f"Failed to retrieve hardware details: {e.stderr}"
 
+def format_model_name(model_slug: str) -> str:
+    """
+    Format internal model identifier slugs into clean, human-readable display titles.
+    Maps canonical Gemini and Gemma model names while providing title-case transformation fallback.
+    """
+    mapping = {
+        'gemini-3.6-flash': 'Gemini 3.6 Flash',
+        'gemini-3.8-flash': 'Gemini 3.8 Flash',
+        'gemini-flash-latest': 'Gemini Flash Latest',
+        'gemini-flash-lite-latest': 'Gemini Flash Lite',
+        'gemini-3.7-flash': 'Gemini 3.7 Flash',
+        'gemini-3-flash-preview': 'Gemini 3 Flash Preview',
+        'gemini-pro-latest': 'Gemini Pro Latest',
+        'gemma-4-26b-a4b-it': 'Gemma 4 26B',
+    }
+    if model_slug in mapping:
+        return mapping[model_slug]
+    return ' '.join(word.capitalize() for word in model_slug.replace('-', ' ').split())
+
 def get_current_model() -> str:
     """
     Retrieve the AI model name that Kiko is currently operating on.
@@ -77,8 +96,9 @@ def get_current_model() -> str:
             model_index = getattr(main_mod, 'current_model_index', 0)
             fallback_list = getattr(main_mod, 'model_fallback_chain', [])
             total = len(fallback_list)
-            return f"Currently running on model '{active_model}' (Index {model_index + 1} of {total} in fallback chain: {', '.join(fallback_list)})."
-        return "Currently running on model: gemini-3.6-flash"
+            formatted = format_model_name(active_model)
+            return f"Currently running on model {formatted} ({active_model}, index {model_index + 1} of {total} in fallback chain)."
+        return f"Currently running on model: {format_model_name('gemini-3.6-flash')}"
     except Exception as e:
         return f"Failed to inspect active model: {e}"
 
