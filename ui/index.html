@@ -240,9 +240,16 @@
 
         <!-- Top bar for current session -->
         <header
-            class="h-16 flex items-center justify-center absolute top-0 w-full z-10 bg-gradient-to-b from-cozy-bg dark:from-cozy-darkBg to-transparent pointer-events-none">
-            <h1 id="current-session-title" class="text-[13px] font-serif italic text-cozy-muted dark:text-gray-400">
+            class="h-16 flex items-center justify-between px-6 absolute top-0 w-full z-10 bg-gradient-to-b from-cozy-bg dark:from-cozy-darkBg to-transparent pointer-events-none">
+            <div class="w-1/4"></div>
+            <h1 id="current-session-title" class="text-[13px] font-serif italic text-cozy-muted dark:text-gray-400 text-center flex-1 truncate">
             </h1>
+            <div class="w-1/4 flex justify-end pointer-events-auto">
+                <div id="model-badge" class="flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 dark:bg-cozy-darkBubble/80 backdrop-blur-sm border border-cozy-border dark:border-cozy-darkBorder text-xs text-cozy-text dark:text-cozy-darkText shadow-sm transition-all" title="Current Active AI Model">
+                    <span id="model-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="current-model-name" class="font-mono text-[11px] font-semibold text-cozy-accent dark:text-emerald-400">gemini-3.6-flash</span>
+                </div>
+            </div>
         </header>
 
         <!-- Chat Feed -->
