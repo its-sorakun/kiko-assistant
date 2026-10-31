@@ -94,8 +94,10 @@ async def upload_image(file: UploadFile = File(...)):
 async def get_current_model():
     """Retrieve the currently active model and fallback chain status."""
     import main
+    from tools.telemetry import format_model_name
     return {
         "model": main.model_name,
+        "display_name": format_model_name(main.model_name),
         "models": main.model_fallback_chain,
         "index": main.current_model_index
     }
@@ -104,10 +106,12 @@ async def get_current_model():
 async def websocket_endpoint(websocket: WebSocket, session_id: int):
     await websocket.accept()
     import main
+    from tools.telemetry import format_model_name
     # Send current model info to frontend immediately upon connection
     await websocket.send_json({
         "type": "model_info",
-        "model": main.model_name
+        "model": main.model_name,
+        "display_name": format_model_name(main.model_name)
     })
     try:
         while True:
@@ -241,7 +245,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                             # Update UI model indicator on fallback
                             await websocket.send_json({
                                 "type": "model_info",
-                                "model": next_model
+                                "model": next_model,
+                                "display_name": format_model_name(next_model)
                             })
                             
                             # Clear current thinking/fallback status
@@ -254,7 +259,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                             # Notify UI of fallback
                             await websocket.send_json({
                                 "type": "status",
-                                "message": f"⚠️ High demand! Switching to {next_model}...",
+                                "message": f"⚠️ High demand! Switching to {format_model_name(next_model)}...",
                                 "status": "running"
                             })
                             
