@@ -1,4 +1,6 @@
 # tools/telemetry.py - Hardware telemetry probing and thermal sensor extraction
+# Implementation details:
+# Probes hardware vitals, thermal shared memory, and coordinates runtime AI model inspection and switching.
 
 # Grabbing CPU/RAM via psutil is straightforward, but thermal data is restricted in Windows user-space. Attempting to probe ACPI thermal zones natively via WMI here. Be aware that without a Ring-0 kernel driver, most modern desktop motherboards will silently block this read.
 import psutil
@@ -143,10 +145,6 @@ def list_available_models() -> str:
                 'gemini-3.1-flash-lite',
                 'gemini-3-flash-preview',
                 'gemini-3.1-pro-preview',
-                'gemini-nano-banana-2.1',
-                'gemini-3.1-flash-image',
-                'gemini-3.1-flash-lite-image',
-                'gemini-3-pro-image',
                 'gemini-omni-1.1-flash',
                 'gemini-flash-latest',
                 'gemini-flash-lite-latest',
@@ -191,6 +189,10 @@ def switch_ai_model(target_model: str) -> str:
             'gemini-3.1-flash-tts-preview': 'audio text-to-speech generation',
             'gemini-3.5-transcribe': 'audio speech-to-text transcription',
             'gemini-3.5-transcribe-live': 'real-time speech transcription',
+            'gemini-nano-banana-2.1': 'image generation and editing',
+            'gemini-3.1-flash-image': 'image generation and editing',
+            'gemini-3.1-flash-lite-image': 'fast image generation and editing',
+            'gemini-3-pro-image': 'high-fidelity image generation and editing',
         }
         cleaned_query = query.replace("gemini", "").replace("-", " ").strip()
         for spec_slug, purpose in specialized_models.items():
