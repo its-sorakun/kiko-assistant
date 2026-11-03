@@ -1,3 +1,8 @@
+# server.py - FastApi and WebSocket server for Kiko's web frontend
+# Implementation details:
+# Exposes chat session endpoints, bidirectional WebSocket streaming, tool execution telemetry,
+# and runtime model switching with automated failure recovery across generative models.
+
 import sys
 import os
 # pyrefly: ignore [missing-import]
@@ -253,11 +258,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                         break
                     except Exception as e:
                         err_str = str(e).lower()
-                        if "503" in err_str or "demand" in err_str or "not found" in err_str or "quota" in err_str:
+                        is_recoverable = any(term in err_str for term in [
+                            "503", "500", "502", "504", "demand", "not found", "quota",
+                            "429", "resource_exhausted", "internal", "server error",
+                            "unavailable", "overloaded", "deadline", "timeout"
+                        ])
+                        if is_recoverable:
                             next_index = (main.current_model_index + 1) % len(main.model_fallback_chain)
                             next_model = main.model_fallback_chain[next_index]
                             
-                            print(f"   [⚠️ {main.model_name} failed (High Demand). Falling back to {next_model}...] (Web UI)")
+                            print(f"   [⚠️ {main.model_name} failed ({e}). Falling back to {next_model}...] (Web UI)")
                             
                             main.current_model_index = next_index
                             main.model_name = next_model
@@ -279,7 +289,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                             # Notify UI of fallback
                             await websocket.send_json({
                                 "type": "status",
-                                "message": f"⚠️ High demand! Switching to {format_model_name(next_model)}...",
+                                "message": f"⚠️ Switchover: {format_model_name(next_model)}...",
                                 "status": "running"
                             })
                             

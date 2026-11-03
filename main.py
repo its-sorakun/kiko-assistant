@@ -304,13 +304,24 @@ def main():
                 return resp
             except Exception as e:
                 err_str = str(e).lower()
-                if "503" in err_str or "demand" in err_str or "not found" in err_str or "quota" in err_str or "429" in err_str or "resource_exhausted" in err_str:
+                is_recoverable = any(term in err_str for term in [
+                    "503", "500", "502", "504", "demand", "not found", "quota",
+                    "429", "resource_exhausted", "internal", "server error",
+                    "unavailable", "overloaded", "deadline", "timeout"
+                ])
+                if is_recoverable:
                     next_index = (current_model_index + 1) % len(model_fallback_chain)
                     next_model = model_fallback_chain[next_index]
-                    print(f"   [⚠️ {tools.format_model_name(model_name)} failed (High Demand). Falling back to {tools.format_model_name(next_model)}...]")
+                    print(f"   [⚠️ {tools.format_model_name(model_name)} failed ({e}). Falling back to {tools.format_model_name(next_model)}...]")
                     current_model_index = next_index
                     model_name = next_model
-                    chat = client.chats.create(model=model_name, config=config)
+                    # Preserve conversation history across the fallback
+                    history = None
+                    try:
+                        history = chat.get_history()
+                    except Exception:
+                        pass
+                    chat = client.chats.create(model=model_name, config=config, history=history)
                     time.sleep(2)
                     continue
                 else:
