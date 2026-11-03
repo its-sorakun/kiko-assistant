@@ -104,15 +104,27 @@ def format_model_name(model_slug: str) -> str:
         return mapping[model_slug]
     return ' '.join(word.capitalize() for word in model_slug.replace('-', ' ').split())
 
+def _get_main_module():
+    """
+    Locates the active main orchestrator module regardless of whether Kiko was launched
+    via the terminal CLI (where the entry script is registered under '__main__')
+    or via the web server/test harnesses (where it is imported as 'main').
+    """
+    import sys
+    for mod_name in ('main', '__main__'):
+        mod = sys.modules.get(mod_name)
+        if mod and hasattr(mod, 'model_fallback_chain'):
+            return mod
+    return None
+
 def get_current_model() -> str:
     """
     Retrieve the AI model name that Kiko is currently operating on.
     Bypasses static hardcoding by inspecting the runtime state of the active model orchestrator.
     """
     try:
-        import sys
-        if 'main' in sys.modules:
-            main_mod = sys.modules['main']
+        main_mod = _get_main_module()
+        if main_mod:
             active_model = getattr(main_mod, 'model_name', 'Unknown')
             model_index = getattr(main_mod, 'current_model_index', 0)
             fallback_list = getattr(main_mod, 'model_fallback_chain', [])
@@ -129,11 +141,10 @@ def list_available_models() -> str:
     Call this whenever the user asks what models are available or what models Kiko can use.
     """
     try:
-        import sys
+        main_mod = _get_main_module()
         fallback_list = []
         active_model = ""
-        if 'main' in sys.modules:
-            main_mod = sys.modules['main']
+        if main_mod:
             fallback_list = getattr(main_mod, 'model_fallback_chain', [])
             active_model = getattr(main_mod, 'model_name', '')
             
@@ -170,11 +181,11 @@ def switch_ai_model(target_model: str) -> str:
     Recreates the active chat session with existing history preserved to prevent context loss.
     """
     try:
-        import sys
-        if 'main' not in sys.modules:
+        import difflib
+        main_mod = _get_main_module()
+        if not main_mod:
             return "Cannot switch models: Core orchestrator module is not loaded."
             
-        main_mod = sys.modules['main']
         allowed_models = getattr(main_mod, 'model_fallback_chain', [])
         
         query = target_model.strip().lower()
@@ -200,6 +211,9 @@ def switch_ai_model(target_model: str) -> str:
             if spec_slug == query or (cleaned_query and cleaned_query in cleaned_spec):
                 return f"Model '{spec_slug}' ({format_model_name(spec_slug)}) is specifically dedicated to {purpose} and does not support standard conversational tool-calling. Please choose a conversational Gemini 3 model like Gemini 3.8 Flash, Gemini 3.6 Flash, or Gemini 3.5 Flash-Lite."
 
+        matched = None
+        matched_idx = -1
+
         # Exact slug match first
         for idx, m in enumerate(allowed_models):
             if m.lower() == query:
@@ -207,7 +221,7 @@ def switch_ai_model(target_model: str) -> str:
                 matched_idx = idx
                 break
                 
-        # Fuzzy matching against slug or formatted title
+        # Substring matching against slug or formatted title
         if not matched:
             for idx, m in enumerate(allowed_models):
                 formatted = format_model_name(m).lower()
@@ -216,6 +230,29 @@ def switch_ai_model(target_model: str) -> str:
                     matched = m
                     matched_idx = idx
                     break
+
+        # Fuzzy matching with difflib to handle typos like 'gemmma 4'
+        if not matched:
+            best_ratio = 0.0
+            best_candidate = None
+            best_idx = -1
+            for idx, m in enumerate(allowed_models):
+                formatted = format_model_name(m).lower()
+                cleaned_m = m.replace("gemini", "").replace("-", " ").strip()
+                
+                ratio_slug = difflib.SequenceMatcher(None, query, m.lower()).ratio()
+                ratio_formatted = difflib.SequenceMatcher(None, query, formatted).ratio()
+                ratio_cleaned = difflib.SequenceMatcher(None, cleaned_query, cleaned_m).ratio() if cleaned_query else 0.0
+                
+                candidate_max = max(ratio_slug, ratio_formatted, ratio_cleaned)
+                if candidate_max > best_ratio:
+                    best_ratio = candidate_max
+                    best_candidate = m
+                    best_idx = idx
+                    
+            if best_candidate and best_ratio >= 0.6:
+                matched = best_candidate
+                matched_idx = best_idx
                     
         if not matched:
             allowed_str = ", ".join(f"`{m}` ({format_model_name(m)})" for m in allowed_models)
