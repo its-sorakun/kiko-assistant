@@ -1,30 +1,34 @@
 ; input_injector.asm - Native Win64 console input synthesis engine
-; Implementation details:
-; Queries the standard console input handle and synthesizes KEY_EVENT_RECORD
-; structures directly into the conhost input buffer via WriteConsoleInputW.
 
+extern printf
+extern GetStdHandle
 default rel
 bits 64
 
 global main
-extern GetStdHandle
 
 section .data
-    ; 64-bit storage for console input handle
     hInput dq 0
+    fmt    db "Console Input Handle: %p", 10, 0
 
 section .text
 
 main:
     sub rsp, 40          ; 32 bytes shadow space + 8 bytes alignment
 
-    ; 1st argument: STD_INPUT_HANDLE (-10) -> ECX
+    ; 1. Ask Windows for the console input handle
     mov ecx, -10
     call GetStdHandle
 
-    ; Save the 64-bit HANDLE from RAX into our memory variable hInput
+    ; 2. Save the handle into memory
     mov [hInput], rax
 
+    ; 3. Print the handle!
+    lea rcx, [fmt]       ; 1st arg: format string -> RCX
+    mov rdx, rax         ; 2nd arg: handle value from RAX -> RDX
+    call printf          ; call C runtime printf(rcx, rdx)
+
+    ; 4. Exit cleanly
     xor eax, eax         ; return 0
     add rsp, 40          ; restore stack pointer
     ret
