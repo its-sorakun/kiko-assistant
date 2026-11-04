@@ -54,33 +54,74 @@ def save_vector_memory(content: str, vector: list):
     """, data)
     con.commit()
 
-def recall_semantic_memory(query_vector: list):
-    """retrieve the most similar vector memory to the query vector."""
-    retrieved_data = cur.execute("SELECT content, vector FROM semantic_memory")
-
-    best_score = -1.0
-    best_content = None
-
-    for i in retrieved_data:
-        content = i[0]
-        vector = struct.unpack('f' * 3072, i[1])
+def recall_semantic_memory(query_vector: list = None, query_text: str = ""):
+    """
+    Retrieve relevant past conversation context using hybrid search (keyword + vector).
+    Runs automatically behind the scenes to provide natural conversational recall.
+    """
+    matched_contents = []
+    seen_contents = set()
+    
+    # 1. Keyword-based lookup for significant terms
+    if query_text:
+        stop_words = {
+            "what", "that", "this", "have", "with", "from", "they", "will", "would",
+            "there", "their", "about", "which", "when", "make", "like", "time", "just",
+            "know", "take", "into", "your", "good", "some", "could", "them", "other",
+            "than", "then", "look", "only", "come", "over", "also", "back", "after",
+            "use", "two", "how", "our", "work", "first", "well", "way", "even", "new",
+            "want", "because", "any", "these", "give", "day", "most", "remember"
+        }
+        words = [w.strip(".,!?:;\"'()[]{}").lower() for w in query_text.split()]
+        keywords = [w for w in words if len(w) >= 4 and w not in stop_words]
         
-        # calculate cosine similarity between query_vector and vector
-        dot_product = sum(a * b for a, b in zip(query_vector, vector))
-        magnitude_query = math.sqrt(sum(a * a for a in query_vector))
-        magnitude_vector = math.sqrt(sum(b * b for b in vector))
-        
-        if magnitude_query == 0 or magnitude_vector == 0:
-            similarity = 0
-        else:
-            similarity = dot_product / (magnitude_query * magnitude_vector)
+        for kw in keywords[:3]:
+            try:
+                cur.execute(
+                    "SELECT content FROM semantic_memory WHERE content LIKE ? ORDER BY id DESC LIMIT 2",
+                    (f"%{kw}%",)
+                )
+                for row in cur.fetchall():
+                    c = row[0]
+                    if c not in seen_contents:
+                        seen_contents.add(c)
+                        matched_contents.append(c)
+            except Exception:
+                pass
+                
+    # 2. Semantic vector cosine similarity
+    if query_vector:
+        try:
+            retrieved_data = cur.execute("SELECT content, vector FROM semantic_memory ORDER BY id DESC LIMIT 200")
+            best_score = -1.0
+            best_content = None
             
-        if similarity > best_score:
-            best_score = similarity
-            best_content = content
+            for row in retrieved_data:
+                content = row[0]
+                if content in seen_contents:
+                    continue
+                vector = struct.unpack('f' * 3072, row[1])
+                
+                dot_product = sum(a * b for a, b in zip(query_vector, vector))
+                magnitude_query = math.sqrt(sum(a * a for a in query_vector))
+                magnitude_vector = math.sqrt(sum(b * b for b in vector))
+                
+                if magnitude_query == 0 or magnitude_vector == 0:
+                    similarity = 0
+                else:
+                    similarity = dot_product / (magnitude_query * magnitude_vector)
+                    
+                if similarity > best_score:
+                    best_score = similarity
+                    best_content = content
+                    
+            if best_score > 0.52 and best_content:
+                matched_contents.append(best_content)
+        except Exception:
+            pass
             
-    if best_score > 0.65:
-        return best_content
+    if matched_contents:
+        return "\n---\n".join(matched_contents[:2])
     return None
 
 def get_recent_interactions(limit: int = 3):
