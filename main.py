@@ -3,8 +3,7 @@
 # Coordinates Google Gemini generative model interactions, dynamic function calling schemas,
 # memory vector integration, and autonomous tool routing across native subsystems.
 
-from tools.memory import save_vector_memory
-from tools.memory import recall_semantic_memory
+from tools.memory import save_vector_memory, recall_semantic_memory, get_recent_interactions, format_elapsed_time
 import os
 import datetime
 from google import genai
@@ -327,9 +326,25 @@ def main():
                 else:
                     raise e
 
-    # Initialize the session context
+    # Initialize the session context with cross-session episodic continuity
     try:
-        response = send_with_fallback(f"Kiko boots up and looks at time: {time_context} before greeting")
+        recent_interactions, last_interaction_ts = get_recent_interactions(limit=3)
+        if recent_interactions and last_interaction_ts:
+            time_elapsed_str = format_elapsed_time(last_interaction_ts)
+            recent_convo_str = "\n---\n".join([item["content"] for item in recent_interactions])
+            boot_prompt = (
+                f"Kiko boots up and wakes up.\n"
+                f"{time_context}"
+                f"[Session Continuity: Kiko was last active with Senpai {time_elapsed_str}.]\n"
+                f"[Context from the end of the previous session before Kiko was shut down / closed:\n"
+                f"{recent_convo_str}\n]\n\n"
+                f"Greet Senpai warmly and naturally! Acknowledge the time that has passed ({time_elapsed_str}) "
+                f"and naturally reference or follow up on what you two were talking about last time if appropriate, like a caring companion!"
+            )
+        else:
+            boot_prompt = f"Kiko boots up and looks at time: {time_context} before greeting"
+            
+        response = send_with_fallback(boot_prompt)
         print(f"\nKiko ({tools.format_model_name(model_name)}): {response.text}")
     except Exception as e:
         print(f"\n[Kiko encountered an error during boot]: {e}")
