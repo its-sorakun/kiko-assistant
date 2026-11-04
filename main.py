@@ -29,11 +29,11 @@ if not api_key or api_key == "your_new_api_key_goes_here":
 client = genai.Client(api_key=api_key)
 
 # Model configuration and fallback chain
-# Primary model is gemini-3.6-flash with official Gemini 3 series and dynamic aliases as fallbacks
+# Primary model is gemini-3.5-flash-lite with official Gemini 3 series and dynamic aliases as fallbacks
 model_fallback_chain = [
+    'gemini-3.5-flash-lite',
     'gemini-3.6-flash',
     'gemini-3.8-flash',
-    'gemini-3.5-flash-lite',
     'gemini-3.1-flash-lite',
     'gemini-3-flash-preview',
     'gemini-3.1-pro-preview',
