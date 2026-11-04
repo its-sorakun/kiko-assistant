@@ -227,12 +227,12 @@ async function loadChat(sessionId, title) {
     connectWebSocket(sessionId);
 }
 
-let activeModelDisplayName = 'Gemini 3.6 Flash';
-let currentModelSlug = 'gemini-3.6-flash';
+let activeModelDisplayName = 'Gemini 3.5 Flash-Lite';
+let currentModelSlug = 'gemini-3.5-flash-lite';
 let availableModelsList = [];
 
 function formatModelName(slug) {
-    if (!slug) return 'Gemini 3.6 Flash';
+    if (!slug) return 'Gemini 3.5 Flash-Lite';
     const mapping = {
         // Gemini 3 - Official Models
         'gemini-3.8-flash': 'Gemini 3.8 Flash',
