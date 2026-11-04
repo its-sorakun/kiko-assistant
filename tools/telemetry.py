@@ -131,7 +131,7 @@ def get_current_model() -> str:
             total = len(fallback_list)
             formatted = format_model_name(active_model)
             return f"Currently running on model {formatted} ({active_model}, index {model_index + 1} of {total} in fallback chain)."
-        return f"Currently running on model: {format_model_name('gemini-3.6-flash')}"
+        return f"Currently running on model: {format_model_name('gemini-3.5-flash-lite')}"
     except Exception as e:
         return f"Failed to inspect active model: {e}"
 
@@ -150,9 +150,9 @@ def list_available_models() -> str:
             
         if not fallback_list:
             fallback_list = [
+                'gemini-3.5-flash-lite',
                 'gemini-3.6-flash',
                 'gemini-3.8-flash',
-                'gemini-3.5-flash-lite',
                 'gemini-3.1-flash-lite',
                 'gemini-3-flash-preview',
                 'gemini-3.1-pro-preview',
