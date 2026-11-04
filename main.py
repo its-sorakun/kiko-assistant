@@ -335,10 +335,10 @@ def main():
             boot_prompt = (
                 f"Kiko boots up and wakes up.\n"
                 f"{time_context}"
-                f"[Session Continuity: Kiko was last active with Senpai {time_elapsed_str}.]\n"
+                f"[Session Continuity: Kiko was last active with the user {time_elapsed_str}.]\n"
                 f"[Context from the end of the previous session before Kiko was shut down / closed:\n"
                 f"{recent_convo_str}\n]\n\n"
-                f"Greet Senpai warmly and naturally! Acknowledge the time that has passed ({time_elapsed_str}) "
+                f"Greet the user warmly and naturally! Acknowledge the time that has passed ({time_elapsed_str}) "
                 f"and naturally reference or follow up on what you two were talking about last time if appropriate, like a caring companion!"
             )
         else:
@@ -376,8 +376,8 @@ def main():
             # retrieve the most similar vector memory to the query vector
             query_vector = embedding_response.embeddings[0].values
 
-            # check semantic memory of user_input
-            memory_match = recall_semantic_memory(query_vector)
+            # check semantic memory of user_input using hybrid recall (keyword + vector)
+            memory_match = recall_semantic_memory(query_vector=query_vector, query_text=user_input)
 
             current_time = datetime.datetime.now().strftime("%A, %Y-%m-%d %H:%M:%S")
             time_context = f"[Current System Time: {current_time}]\n"
@@ -437,13 +437,18 @@ def main():
                 available_tools = [getattr(sys.modules['tools'], func_name) for func_name in sys.modules['tools'].__all__]
                 available_tools.extend([clear_short_term_memory, reload_core_systems])
                 
-                # Update the gemini config and recreate the chat session
+                # Update the gemini config and recreate the chat session preserving history
                 config = types.GenerateContentConfig(
                     system_instruction=system_instruction + f"\nYour preferences are: {memories_str}",
                     tools=available_tools,
                     temperature=0.7,
                 )
-                chat = client.chats.create(model=model_name, config=config)
+                existing_history = None
+                try:
+                    existing_history = chat.get_history()
+                except Exception:
+                    pass
+                chat = client.chats.create(model=model_name, config=config, history=existing_history)
                 
                 print("   [🔧 System: Modules successfully hot-swapped!]")
                 needs_system_reload = False
