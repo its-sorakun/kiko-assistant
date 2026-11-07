@@ -5,7 +5,9 @@
 
 from tools.memory import save_vector_memory, recall_semantic_memory, get_recent_interactions, format_elapsed_time
 import os
+import time
 import datetime
+import threading
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -48,6 +50,15 @@ current_model_index = 0
 model_name = model_fallback_chain[current_model_index]
 
 needs_memory_clear = False
+
+# Standby mode state
+# Kiko enters standby after 10 minutes of inactivity or when manually triggered.
+# During standby the chat loop blocks on input() — no API calls, no token usage.
+# Thermal monitor thread keeps running at full polling rate regardless of standby state.
+in_standby = False
+standby_start_time = 0.0
+last_activity_time = time.time()
+STANDBY_TIMEOUT = 600  # 10 minutes in seconds
 
 def clear_short_term_memory() -> str:
     """
@@ -257,8 +268,37 @@ def terminal_interceptor_thread():
         except Exception as e:
             print(f"\n[Kiko Terminal Watcher Exception]: {e}")
 
+def standby_watchdog_thread():
+    # Inactivity watchdog that auto-triggers standby after STANDBY_TIMEOUT seconds of silence.
+    # Checks every 10 seconds whether the user has been idle long enough.
+    # Does NOT touch the thermal monitor — GPU/CPU temps are always watched.
+    global in_standby, standby_start_time, last_activity_time
+    
+    while True:
+        time.sleep(10)
+        if not in_standby and (time.time() - last_activity_time) > STANDBY_TIMEOUT:
+            in_standby = True
+            standby_start_time = time.time()
+            print(f"\n   [💤 Kiko is going to sleep... Oyasumi, Senpai~ Sweet dreams! ✨]")
+            print(f"   [Press Enter or type anything to wake Kiko up!]")
+            print(f"\nSenpai > ", end="", flush=True)
+
+def format_standby_duration(seconds):
+    # Formats elapsed standby time into a human-readable string.
+    if seconds < 60:
+        return f"{int(seconds)} seconds"
+    elif seconds < 3600:
+        mins = int(seconds // 60)
+        return f"{mins} minute{'s' if mins != 1 else ''}"
+    else:
+        hours = int(seconds // 3600)
+        remaining_mins = int((seconds % 3600) // 60)
+        if remaining_mins > 0:
+            return f"{hours} hour{'s' if hours != 1 else ''} and {remaining_mins} minute{'s' if remaining_mins != 1 else ''}"
+        return f"{hours} hour{'s' if hours != 1 else ''}"
+
 def main():
-    global chat, config
+    global chat, config, in_standby, standby_start_time, last_activity_time
     # boot the c++ hardware monitoring daemon silently in the background before aiko wakes up
     import subprocess
     
@@ -280,15 +320,18 @@ def main():
         )
 
     # spin up the background thermal observer before blocking on chat
-    import threading
     monitor = threading.Thread(target=thermal_monitor_thread, daemon=True)
     monitor.start()
 
     terminal_watcher = threading.Thread(target=terminal_interceptor_thread, daemon=True)
     terminal_watcher.start()
 
+    # Inactivity watchdog — auto-standby after STANDBY_TIMEOUT seconds of no input
+    standby_watcher = threading.Thread(target=standby_watchdog_thread, daemon=True)
+    standby_watcher.start()
+
     print(f"--- Kiko is waking up! ({tools.format_model_name(model_name)}) ---")
-    print("(Type 'exit' or 'quit' to terminate)")
+    print("(Type 'exit', 'quit' to terminate | 'standby', 'sleep' to nap)")
     
     current_time = datetime.datetime.now().strftime("%A, %Y-%m-%d %H:%M:%S")
     # print(current_time)
@@ -353,10 +396,50 @@ def main():
         try:
             user_input = input("\nSenpai > ")
             
+            # Reset inactivity timer on any input (including empty Enter)
+            last_activity_time = time.time()
+            woke_from_standby = False
+            
+            # Handle wake-up from standby mode
+            if in_standby:
+                nap_duration = time.time() - standby_start_time
+                nap_str = format_standby_duration(nap_duration)
+                in_standby = False
+                
+                # Empty input or simple wake phrases — just wake up with a cute message
+                wake_phrases = ['', 'wake up', 'hey', 'kiko', 'yo', 'oi', 'ohayo', 'morning']
+                if user_input.strip().lower() in wake_phrases:
+                    print("   [⚡ Kiko is waking up...]")
+                    try:
+                        wake_prompt = (
+                            f"You just woke up from a {nap_str} nap/standby! "
+                            f"The user woke you up. Stretch, yawn cutely, and greet them! "
+                            f"Mention how long you napped ({nap_str})."
+                        )
+                        response = send_with_fallback(wake_prompt)
+                        print(f"\nKiko ({tools.format_model_name(model_name)}): {response.text}")
+                    except Exception as e:
+                        print(f"\n   [💫 *yawns* Kiko is back after a {nap_str} nap!]")
+                    continue
+                else:
+                    # User typed an actual command on wake — process it immediately
+                    # The wake context gets prepended to the prompt below
+                    woke_from_standby = True
+                    print(f"   [💫 Kiko wakes up after a {nap_str} nap!]")
+                    print("   [⚡ Kiko is thinking / executing...]")
+            
             # Exit the loop if the user types 'exit' or 'quit'
             if user_input.lower() in ['exit', 'quit']:
                 print("Matane, senpai! See you later!")
                 break
+            
+            # Manual standby trigger
+            if user_input.lower() in ['standby', 'sleep']:
+                in_standby = True
+                standby_start_time = time.time()
+                print("   [💤 Kiko is going to sleep... Oyasumi, Senpai~ Sweet dreams! ✨]")
+                print("   [Press Enter or type anything to wake Kiko up!]")
+                continue
                 
             # Clear short-term memory (context window) to free up token usage
             if user_input.lower() == 'clear':
@@ -389,8 +472,9 @@ def main():
                 augmented_prompt = f"{time_context}Context from past conversation:\n{memory_match}\n\nUser: {user_input}"
 
                 
-            # Indicate active processing to terminal
-            print("   [⚡ Kiko is thinking / executing...]")
+            # Indicate active processing to terminal (skip if already printed during wake-up)
+            if not woke_from_standby:
+                print("   [⚡ Kiko is thinking / executing...]")
             
             # The SDK handles function calling autonomously
             try:
