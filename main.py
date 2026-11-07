@@ -81,9 +81,20 @@ def reload_core_systems() -> str:
     needs_system_reload = True
     return "System hot-reload scheduled. Modules will be hot-swapped seamlessly from disk after this turn."
 
+needs_standby = False
+
+def enter_standby_mode() -> str:
+    """
+    Puts Kiko into low-power standby mode.
+    Call this tool autonomously when the user tells you to sleep, nap, rest, take a break, or go into standby mode.
+    """
+    global needs_standby
+    needs_standby = True
+    return "Standby mode activated. Kiko will enter standby mode immediately after this message."
+
 # Dynamically construct available_tools from the tools package exports
 available_tools = [getattr(tools, func_name) for func_name in tools.__all__]
-available_tools.extend([clear_short_term_memory, reload_core_systems])
+available_tools.extend([clear_short_term_memory, reload_core_systems, enter_standby_mode])
 
 
 system_instruction = f"""
@@ -92,6 +103,7 @@ Your personality is cute, cheerful, and energetic. You are an anime girl.
 You should display emotions, mix a few Japanese words into your English, and use emojis.
 If I ask you to do something on the PC (like list folder contents, open a folder visually, launch/open a file, check stats, kill a process, inspect or kill an application running on a specific network port, control media, check registry, lock the PC, shut down, or find a file globally on the system), use your tools to do it!
 If the user asks what model, LLM, or AI version you are running on, use the `get_current_model` tool to inspect your active runtime model! If the user asks what models are available or asks you to list models, use `list_available_models`. If the user asks you to switch models or use a different model, use `switch_ai_model` to switch your active engine!
+If the user tells you to go to sleep, take a nap, rest, or enter standby mode, you MUST use the `enter_standby_mode` tool!
 If I ask you to play a specific song, artist, album, or create a playlist on Spotify, use your Spotify tools. However, for simple "pause", "resume", or "skip" commands, just use your local `control_system_media` tool!
 You can also read the contents of ANY active window on my screen (like Chrome, Discord, or a code editor) using `read_active_window_content`. This tool is armed with a native C++ Direct Memory Scanner that rips raw text directly from the physical RAM. The output will be a massive, fragmented dump of raw heap strings—usernames, timestamps, and messages will appear out of order. You MUST read through this fragmented noise carefully to piece together the chat/context. Do NOT apologize or claim you can't see the chat; the text IS there, just search through the raw strings for conversational sentences! Use this if I ask you to "read what I'm looking at", "use your memory scanner", or summarize an active webpage/chat.
 If I ask you a visual question, like "what game is this", "what should I do next in this game", or "look at this picture", you MUST use the `analyze_screen` tool! This tool natively attempts to use a C++ DXGI capture to rip the frame buffer straight from the GPU. If the game uses MPO or anti-cheat that causes a black screen, the tool will automatically detect this and fallback to a slower GDI BitBlt capture. Use it whenever text scraping isn't enough and you actually need to *see* my screen!
@@ -399,6 +411,7 @@ def main():
             # Reset inactivity timer on any input (including empty Enter)
             last_activity_time = time.time()
             woke_from_standby = False
+            wake_context = ""
             
             # Handle wake-up from standby mode
             if in_standby:
@@ -423,8 +436,8 @@ def main():
                     continue
                 else:
                     # User typed an actual command on wake — process it immediately
-                    # The wake context gets prepended to the prompt below
                     woke_from_standby = True
+                    wake_context = f"[System notice: You just woke up from a {nap_str} nap/standby because the user gave you a new task. Acknowledge waking up briefly and cheerfully before executing the task!]\n"
                     print(f"   [💫 Kiko wakes up after a {nap_str} nap!]")
                     print("   [⚡ Kiko is thinking / executing...]")
             
@@ -465,11 +478,11 @@ def main():
             current_time = datetime.datetime.now().strftime("%A, %Y-%m-%d %H:%M:%S")
             time_context = f"[Current System Time: {current_time}]\n"
             
-            augmented_prompt = f"{time_context}{user_input}"
+            augmented_prompt = f"{time_context}{wake_context}{user_input}"
             if memory_match:
                 # print(f"\n RAG Engine found a Cosine Similarity match.")
                 # print(f" Context Injected: {memory_match}")
-                augmented_prompt = f"{time_context}Context from past conversation:\n{memory_match}\n\nUser: {user_input}"
+                augmented_prompt = f"{time_context}{wake_context}Context from past conversation:\n{memory_match}\n\nUser: {user_input}"
 
                 
             # Indicate active processing to terminal (skip if already printed during wake-up)
@@ -501,6 +514,14 @@ def main():
                 chat = client.chats.create(model=model_name, config=config)
                 needs_memory_clear = False
 
+            global needs_standby
+            if needs_standby:
+                in_standby = True
+                standby_start_time = time.time()
+                print("\n   [💤 Kiko entered standby mode... Oyasumi, Senpai~ Sweet dreams! ✨]")
+                print("   [Press Enter or type anything to wake Kiko up!]")
+                needs_standby = False
+
             global needs_system_reload
             if needs_system_reload:
                 print("   [🔧 System: Hot-Reloading Tool Modules from Disk...]")
@@ -519,7 +540,7 @@ def main():
                 
                 # Rebuild the available_tools array with the fresh memory pointers
                 available_tools = [getattr(sys.modules['tools'], func_name) for func_name in sys.modules['tools'].__all__]
-                available_tools.extend([clear_short_term_memory, reload_core_systems])
+                available_tools.extend([clear_short_term_memory, reload_core_systems, enter_standby_mode])
                 
                 # Update the gemini config and recreate the chat session preserving history
                 config = types.GenerateContentConfig(
