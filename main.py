@@ -272,8 +272,9 @@ def terminal_interceptor_thread():
                 )
                 
                 if response.text:
+                    prompt_label = "\n> " if in_standby else "\nSenpai > "
                     # Print locally so Kiko's terminal updates too
-                    print(f"\nKiko (Terminal Watcher - {tools.format_model_name(model_name)}): {response.text}\nSenpai > ", end="", flush=True)
+                    print(f"\nKiko (Terminal Watcher - {tools.format_model_name(model_name)}): {response.text}{prompt_label}", end="", flush=True)
                     # Send the response back to the C++ shell's ephemeral port
                     sock.sendto(response.text.encode('utf-8'), addr)
                     
@@ -284,16 +285,42 @@ def standby_watchdog_thread():
     # Inactivity watchdog that auto-triggers standby after STANDBY_TIMEOUT seconds of silence.
     # Checks every 10 seconds whether the user has been idle long enough.
     # Does NOT touch the thermal monitor — GPU/CPU temps are always watched.
-    global in_standby, standby_start_time, last_activity_time
+    global in_standby, standby_start_time, last_activity_time, client, model_name, system_instruction
     
     while True:
         time.sleep(10)
         if not in_standby and (time.time() - last_activity_time) > STANDBY_TIMEOUT:
             in_standby = True
             standby_start_time = time.time()
-            print(f"\n   [💤 Kiko is going to sleep... Oyasumi, Senpai~ Sweet dreams! ✨]")
+            
+            # Autonomously generate a cute sleepy message before entering standby
+            sleepy_text = None
+            try:
+                auto_standby_prompt = (
+                    "The user has been idle/inactive for 10 minutes and you are about to nod off into standby mode. "
+                    "Say a short, cute, sweet 1-2 sentence sleepy message before falling asleep! "
+                    "Yawn, stretch, wish senpai well or say oyasumi-nasai. Keep it cute, brief, and sleepy."
+                )
+                resp = client.models.generate_content(
+                    model=model_name,
+                    contents=auto_standby_prompt,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.7,
+                    )
+                )
+                if resp and resp.text:
+                    sleepy_text = resp.text.strip()
+            except Exception:
+                sleepy_text = None
+                
+            if not sleepy_text:
+                sleepy_text = "*yawns cutely* Senpai seems quiet right now... I'll take a little nap and wait right here for you~ Oyasumi-nasai! 💤✨"
+                
+            print(f"\n\nKiko ({tools.format_model_name(model_name)}): {sleepy_text}")
+            print(f"   [💤 Kiko entered auto-standby mode... Oyasumi, Senpai~ Sweet dreams! ✨]")
             print(f"   [Press Enter or type anything to wake Kiko up!]")
-            print(f"\nSenpai > ", end="", flush=True)
+            print(f"\n> ", end="", flush=True)
 
 def format_standby_duration(seconds):
     # Formats elapsed standby time into a human-readable string.
@@ -406,7 +433,8 @@ def main():
     
     while True:
         try:
-            user_input = input("\nSenpai > ")
+            prompt_str = "\n> " if in_standby else "\nSenpai > "
+            user_input = input(prompt_str)
             
             # Reset inactivity timer on any input (including empty Enter)
             last_activity_time = time.time()
