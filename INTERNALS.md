@@ -242,3 +242,15 @@ To prevent opaque LLM failures and maintain full operational transparency, Kiko 
 - **Terminal Model Prompts**: The CLI boot sequence announces the active engine (`--- Kiko is waking up! [Active Model: gemini-3.6-flash] ---`), and dynamically updates the interactive input prompt (`[gemini-3.6-flash] > `) after any runtime fallback occurs.
 - **WebSocket Reactive Pill & REST Reflection**: `server.py` exposes `GET /api/model` and broadcasts `model_info` payloads over WebSockets upon connection and during failover loops. The frontend reflects this via a floating model badge in the top bar, maintaining continuous awareness of model transitions without page reloads.
 - **Runtime Reflection Tooling**: The `get_current_model()` tool inspects `sys.modules['main']` dynamically at runtime, allowing Kiko to self-report her exact active model and chain position in conversation without hallucination.
+
+## 26. Low-Power Standby & Win32 Working Set Trimming
+**File:** `main.py` -> `enter_low_resource_standby()`, `restore_normal_resources()`, `standby_watchdog_thread()`
+
+To minimize background resource footprint when inactive without terminating the process or interrupting background hardware monitoring, Kiko implements an operating-system-level standby state.
+- **Triggers**: Standby is entered via three paths:
+  1. An inactivity watchdog thread (`standby_watchdog_thread`) that monitors `last_activity_time` and triggers after 600 seconds (10 minutes) of silence, generating an in-character notice before nodding off.
+  2. Manual CLI commands (`standby`, `sleep`).
+  3. Autonomous function invocation via the `enter_standby_mode` tool when instructed conversationally.
+- **Dynamic CLI Prompt Transition**: During active conversation, the terminal prompt displays `Senpai > `. Upon transitioning into standby, the prompt switches to a minimal `> `. Any keypress or command input immediately wakes the assistant, calculating elapsed nap duration via UTC timestamps and restoring the full interactive prompt.
+- **Physical Working Set Trimming**: Long-running Python processes retain substantial virtual memory allocations for LLM client configurations, Pydantic schemas, and tool dictionaries (~120MB+ RSS). Upon entering standby, a Python garbage collection cycle (`gc.collect()`) runs, immediately followed by a call to `psapi.dll!EmptyWorkingSet(GetCurrentProcess())`. This instructs the Windows Memory Manager to unmap inactive pages from physical RAM into the paging file, slashing physical memory usage down to ~15MB. Pages are faulted back into physical RAM on-demand with microsecond latency upon waking.
+- **OS Scheduler Priority Throttling**: Standby mode transitions the process priority to `IDLE_PRIORITY_CLASS` (`0x00000040`) via `kernel32.dll!SetPriorityClass`. This guarantees that background observer threads (such as the 2-second thermal monitor) yield 100% of CPU time slices to foreground games or intensive tasks. Waking the assistant immediately restores the priority to `NORMAL_PRIORITY_CLASS` (`0x00000020`).
