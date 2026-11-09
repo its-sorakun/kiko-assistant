@@ -297,9 +297,10 @@ def standby_watchdog_thread():
             sleepy_text = None
             try:
                 auto_standby_prompt = (
-                    "The user has been idle/inactive for 10 minutes and you are about to nod off into standby mode. "
-                    "Say a short, cute, sweet 1-2 sentence sleepy message before falling asleep! "
-                    "Yawn, stretch, wish senpai well or say oyasumi-nasai. Keep it cute, brief, and sleepy."
+                    "There has been no activity for a while and senpai seems away or busy. "
+                    "Say a cute, 1-2 sentence message noting the lack of activity and that you are entering standby mode for now "
+                    "(e.g. 'It seems like there isn't much activity here senpai, Kiko will enter standby mode for now... call me anytime!'). "
+                    "Keep it sweet, in-character, and brief. Do not say sweet dreams."
                 )
                 resp = client.models.generate_content(
                     model=model_name,
@@ -315,10 +316,10 @@ def standby_watchdog_thread():
                 sleepy_text = None
                 
             if not sleepy_text:
-                sleepy_text = "*yawns cutely* Senpai seems quiet right now... I'll take a little nap and wait right here for you~ Oyasumi-nasai! 💤✨"
+                sleepy_text = "It seems like there isn't much activity right now, senpai... Kiko will enter standby mode for now! Just call me whenever you need me~ 💤✨"
                 
             print(f"\n\nKiko ({tools.format_model_name(model_name)}): {sleepy_text}")
-            print(f"   [💤 Kiko entered auto-standby mode... Oyasumi, Senpai~ Sweet dreams! ✨]")
+            print(f"   [💤 Kiko entered standby mode]")
             print(f"   [Press Enter or type anything to wake Kiko up!]")
             print(f"\n> ", end="", flush=True)
 
@@ -478,7 +479,7 @@ def main():
             if user_input.lower() in ['standby', 'sleep']:
                 in_standby = True
                 standby_start_time = time.time()
-                print("   [💤 Kiko is going to sleep... Oyasumi, Senpai~ Sweet dreams! ✨]")
+                print("   [💤 Kiko entered standby mode]")
                 print("   [Press Enter or type anything to wake Kiko up!]")
                 continue
                 
@@ -546,7 +547,7 @@ def main():
             if needs_standby:
                 in_standby = True
                 standby_start_time = time.time()
-                print("\n   [💤 Kiko entered standby mode... Oyasumi, Senpai~ Sweet dreams! ✨]")
+                print("\n   [💤 Kiko entered standby mode]")
                 print("   [Press Enter or type anything to wake Kiko up!]")
                 needs_standby = False
 
