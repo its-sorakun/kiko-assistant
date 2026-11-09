@@ -338,32 +338,46 @@ def format_standby_duration(seconds):
             return f"{hours} hour{'s' if hours != 1 else ''} and {remaining_mins} minute{'s' if remaining_mins != 1 else ''}"
         return f"{hours} hour{'s' if hours != 1 else ''}"
 
+# Configure 64-bit Win32 prototypes for process priority and memory trimming.
+# On 64-bit Windows, unconfigured ctypes defaults to 32-bit int, which truncates the
+# 64-bit pseudo-handle (0xFFFFFFFFFFFFFFFF) returned by GetCurrentProcess() into a
+# 32-bit integer, causing Win32 API calls to fail silently with ERROR_INVALID_HANDLE (6).
+import ctypes
+kernel32 = ctypes.windll.kernel32
+psapi = ctypes.windll.psapi
+
+kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+kernel32.SetPriorityClass.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
+kernel32.SetPriorityClass.restype = ctypes.c_bool
+psapi.EmptyWorkingSet.argtypes = [ctypes.c_void_p]
+psapi.EmptyWorkingSet.restype = ctypes.c_bool
+
 def enter_low_resource_standby():
     # Enters low-resource state: drops process priority to IDLE so background monitoring
     # does not compete for CPU cycles with foreground games/applications, runs a garbage
     # collection sweep, and forces the Windows Memory Manager to trim the physical RAM working set.
     import gc
-    import ctypes
     try:
         # IDLE_PRIORITY_CLASS = 0x00000040
-        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00000040)
+        h_process = kernel32.GetCurrentProcess()
+        kernel32.SetPriorityClass(h_process, 0x00000040)
         
         # Flush unreferenced objects from Python heap before trimming physical pages
         gc.collect()
         
         # EmptyWorkingSet flushes non-essential virtual pages from physical RAM
-        ctypes.windll.psapi.EmptyWorkingSet(ctypes.windll.kernel32.GetCurrentProcess())
-    except Exception:
-        pass
+        psapi.EmptyWorkingSet(h_process)
+    except Exception as e:
+        print(f"   [⚠️ Warning: Failed to enter low-resource standby: {e}]")
 
 def restore_normal_resources():
     # Restores process priority to NORMAL_PRIORITY_CLASS when waking up from standby.
-    import ctypes
     try:
         # NORMAL_PRIORITY_CLASS = 0x00000020
-        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00000020)
-    except Exception:
-        pass
+        h_process = kernel32.GetCurrentProcess()
+        kernel32.SetPriorityClass(h_process, 0x00000020)
+    except Exception as e:
+        print(f"   [⚠️ Warning: Failed to restore normal process priority: {e}]")
 
 def main():
     global chat, config, in_standby, standby_start_time, last_activity_time
