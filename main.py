@@ -322,6 +322,7 @@ def standby_watchdog_thread():
             print(f"   [💤 Kiko entered standby mode]")
             print(f"   [Press Enter or type anything to wake Kiko up!]")
             print(f"\n> ", end="", flush=True)
+            enter_low_resource_standby()
 
 def format_standby_duration(seconds):
     # Formats elapsed standby time into a human-readable string.
@@ -336,6 +337,33 @@ def format_standby_duration(seconds):
         if remaining_mins > 0:
             return f"{hours} hour{'s' if hours != 1 else ''} and {remaining_mins} minute{'s' if remaining_mins != 1 else ''}"
         return f"{hours} hour{'s' if hours != 1 else ''}"
+
+def enter_low_resource_standby():
+    # Enters low-resource state: drops process priority to IDLE so background monitoring
+    # does not compete for CPU cycles with foreground games/applications, runs a garbage
+    # collection sweep, and forces the Windows Memory Manager to trim the physical RAM working set.
+    import gc
+    import ctypes
+    try:
+        # IDLE_PRIORITY_CLASS = 0x00000040
+        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00000040)
+        
+        # Flush unreferenced objects from Python heap before trimming physical pages
+        gc.collect()
+        
+        # EmptyWorkingSet flushes non-essential virtual pages from physical RAM
+        ctypes.windll.psapi.EmptyWorkingSet(ctypes.windll.kernel32.GetCurrentProcess())
+    except Exception:
+        pass
+
+def restore_normal_resources():
+    # Restores process priority to NORMAL_PRIORITY_CLASS when waking up from standby.
+    import ctypes
+    try:
+        # NORMAL_PRIORITY_CLASS = 0x00000020
+        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x00000020)
+    except Exception:
+        pass
 
 def main():
     global chat, config, in_standby, standby_start_time, last_activity_time
@@ -444,6 +472,7 @@ def main():
             
             # Handle wake-up from standby mode
             if in_standby:
+                restore_normal_resources()
                 nap_duration = time.time() - standby_start_time
                 nap_str = format_standby_duration(nap_duration)
                 in_standby = False
@@ -481,6 +510,7 @@ def main():
                 standby_start_time = time.time()
                 print("   [💤 Kiko entered standby mode]")
                 print("   [Press Enter or type anything to wake Kiko up!]")
+                enter_low_resource_standby()
                 continue
                 
             # Clear short-term memory (context window) to free up token usage
@@ -549,6 +579,7 @@ def main():
                 standby_start_time = time.time()
                 print("\n   [💤 Kiko entered standby mode]")
                 print("   [Press Enter or type anything to wake Kiko up!]")
+                enter_low_resource_standby()
                 needs_standby = False
 
             global needs_system_reload
