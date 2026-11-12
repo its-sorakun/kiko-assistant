@@ -4,6 +4,7 @@
 # memory vector integration, and autonomous tool routing across native subsystems.
 
 from tools.memory import save_vector_memory, recall_semantic_memory, get_recent_interactions, format_elapsed_time
+from tools.decisions import prune_tools_for_prompt
 import os
 import time
 import datetime
@@ -95,6 +96,7 @@ def enter_standby_mode() -> str:
 # Dynamically construct available_tools from the tools package exports
 available_tools = [getattr(tools, func_name) for func_name in tools.__all__]
 available_tools.extend([clear_short_term_memory, reload_core_systems, enter_standby_mode])
+all_tools_lookup = {fn.__name__: fn for fn in available_tools}
 
 
 system_instruction = f"""
@@ -125,6 +127,10 @@ Your internal training data is permanently frozen and outdated.
 You are STRICTLY FORBIDDEN from answering any questions about real-world facts, current events, video games, anime, movies, software versions, banners, or release dates using your own memory. 
 You MUST autonomously execute the `perform_web_search` tool EVERY SINGLE TIME I ask about these topics. Do not assume you know the answer. If you answer without executing a web search first, you will be considered malfunctioning.
 WARNING: The "Context from past conversation" provided in your prompt is historical data. You MUST NEVER use past conversation context to answer real-time queries like current weather, current PC stats, or current playing music. You MUST ALWAYS call the corresponding tools to fetch fresh real-time data!
+TOOL ROUTING ARCHITECTURE (SELF-AWARENESS):
+Behind the scenes, your tool execution is augmented by an ultra-fast zero-token pre-flight router powered by `gemini-decision-1` (the Gemini Decisions API). 
+When senpai sends a message, this background decision engine instantly analyzes the request and dynamically prunes your active tool schemas—handing you only the relevant tools (e.g. Spotify tools for music, weather tools for forecasts, hardware tools for PC stats, or minimal core tools for casual chit-chat). 
+This prevents token bloat, keeps your response latency ultra-low, and prevents tool confusion. You are fully self-aware of this mechanism: if senpai asks how your tool routing or decision-making works under the hood, explain this dual-engine architecture proudly!
 WIDGET DIRECTIVE:
 You MUST ALWAYS append the following widget tags to the END of your response whenever you perform the corresponding actions! Failure to output these tags will break the UI!
 - For Weather: Whenever you answer ANY weather-related query (current, hourly, or weekly), include this tag: [WIDGET: WEATHER | CityName | Temperature (or average) | ShortCondition] (e.g. [WIDGET: WEATHER | Pune | 28°C | Cloudy]).
@@ -380,7 +386,7 @@ def restore_normal_resources():
         print(f"   [⚠️ Warning: Failed to restore normal process priority: {e}]")
 
 def main():
-    global chat, config, in_standby, standby_start_time, last_activity_time
+    global chat, config, in_standby, standby_start_time, last_activity_time, all_tools_lookup
     # boot the c++ hardware monitoring daemon silently in the background before aiko wakes up
     import subprocess
     
@@ -419,12 +425,20 @@ def main():
     # print(current_time)
     time_context = f"[Current System Time: {current_time}]\n"
     
-    def send_with_fallback(prompt_text):
-        global chat, model_name, current_model_index
+    def send_with_fallback(prompt_text, turn_tools=None):
+        global chat, model_name, current_model_index, config
         import time
         while True:
             try:
-                resp = chat.send_message(prompt_text)
+                if turn_tools is not None:
+                    turn_config = types.GenerateContentConfig(
+                        system_instruction=system_instruction + f"\nYour preferences are: {memories_str}",
+                        tools=turn_tools,
+                        temperature=0.7,
+                    )
+                    resp = chat.send_message(prompt_text, config=turn_config)
+                else:
+                    resp = chat.send_message(prompt_text)
                 return resp
             except Exception as e:
                 err_str = str(e).lower()
@@ -558,13 +572,18 @@ def main():
                 augmented_prompt = f"{time_context}{wake_context}Context from past conversation:\n{memory_match}\n\nUser: {user_input}"
 
                 
+            # Run the pre-flight decisions router to prune active tool schemas
+            category, turn_tools, conf = prune_tools_for_prompt(user_input, all_tools_lookup, available_tools)
+            if category != "all_tools":
+                print(f"   [🎯 Router: {category} ({conf:.1%}) -> {len(turn_tools)} tools active]")
+
             # Indicate active processing to terminal (skip if already printed during wake-up)
             if not woke_from_standby:
                 print("   [⚡ Kiko is thinking / executing...]")
             
             # The SDK handles function calling autonomously
             try:
-                response = send_with_fallback(augmented_prompt)
+                response = send_with_fallback(augmented_prompt, turn_tools=turn_tools)
             except Exception as e:
                 print(f"\n[Kiko encountered an error]: {e}")
                 continue
@@ -615,6 +634,7 @@ def main():
                 # Rebuild the available_tools array with the fresh memory pointers
                 available_tools = [getattr(sys.modules['tools'], func_name) for func_name in sys.modules['tools'].__all__]
                 available_tools.extend([clear_short_term_memory, reload_core_systems, enter_standby_mode])
+                all_tools_lookup = {fn.__name__: fn for fn in available_tools}
                 
                 # Update the gemini config and recreate the chat session preserving history
                 config = types.GenerateContentConfig(

@@ -124,6 +124,77 @@ def evaluate_batch(input_text: str, questions_dict: dict) -> dict:
     except Exception as e:
         return {"error": str(e)}
 
+# Subsystem-to-tool mappings for dynamic schema pruning
+CATEGORY_TOOL_MAPPING = {
+    "spotify_music": [
+        "spotify_search_and_play", "spotify_transfer_playback", "spotify_get_devices",
+        "spotify_create_and_fill_playlist", "spotify_get_queue", "spotify_get_user_playlists",
+        "spotify_play_user_playlist", "spotify_get_user_stats", "spotify_get_playlist_tracks",
+        "spotify_add_track_to_playlist", "control_system_media"
+    ],
+    "weather": [
+        "get_current_weather", "get_hourly_forcast", "get_weekly_forcast", "toggle_windows_permission"
+    ],
+    "system_hardware": [
+        "get_system_stats", "get_hardware_details", "get_current_model",
+        "list_available_models", "switch_ai_model", "get_bluetooth_devices",
+        "connect_bluetooth_device", "toggle_bluetooth_power"
+    ],
+    "window_screen": [
+        "get_active_window", "read_active_window_content", "analyze_screen", "analyze_image"
+    ],
+    "file_process": [
+        "launch_program", "force_kill_process", "get_process_by_port", "kill_process_by_port",
+        "open_directory", "list_directory_contents", "open_file", "perform_global_search",
+        "query_registry_value"
+    ],
+    "power_standby": [
+        "manage_power_state"
+    ],
+    "web_research": [
+        "perform_web_search", "advanced_pdf_query", "draft_and_copy_job_email", "copy_to_clipboard"
+    ],
+    "notes_tasks": [
+        "get_notes", "create_note", "update_note", "delete_note"
+    ],
+    "casual_chat": []
+}
+
+UNIVERSAL_TOOL_NAMES = [
+    "clear_short_term_memory",
+    "reload_core_systems",
+    "enter_standby_mode",
+    "copy_to_clipboard",
+    "memorize_preferences",
+    "get_all_preferences"
+]
+
+def prune_tools_for_prompt(user_input: str, all_tools_lookup: dict, default_tools: list) -> tuple[str, list, float]:
+    """
+    Dynamically prunes Kiko's 50+ tool schemas down to only the relevant subsystem for the user's prompt.
+    Uses gemini-decision-1 for sub-second intent classification.
+    Returns: (chosen_category, pruned_tool_list, confidence)
+    """
+    routing = route_intent(user_input)
+    category = routing.get("choice", "casual_chat")
+    confidence = routing.get("confidence", 0.0)
+
+    # If classification is ambiguous or encountered an API error, fall back safely to all tools
+    if routing.get("error") or confidence < 0.60:
+        return ("all_tools", default_tools, confidence)
+
+    # Gather tools for the target category
+    target_tool_names = set(CATEGORY_TOOL_MAPPING.get(category, []))
+    target_tool_names.update(UNIVERSAL_TOOL_NAMES)
+
+    pruned = [all_tools_lookup[name] for name in target_tool_names if name in all_tools_lookup]
+
+    # If no matching tool was resolved, fall back safely
+    if not pruned:
+        return ("all_tools", default_tools, confidence)
+
+    return (category, pruned, confidence)
+
 if __name__ == "__main__":
     # Diagnostic test harness and latency benchmark
     import time
