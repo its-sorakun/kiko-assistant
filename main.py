@@ -386,7 +386,7 @@ def restore_normal_resources():
         print(f"   [⚠️ Warning: Failed to restore normal process priority: {e}]")
 
 def main():
-    global chat, config, in_standby, standby_start_time, last_activity_time, all_tools_lookup
+    global chat, config, in_standby, standby_start_time, last_activity_time, all_tools_lookup, available_tools
     # boot the c++ hardware monitoring daemon silently in the background before aiko wakes up
     import subprocess
     
