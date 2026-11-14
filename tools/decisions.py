@@ -5,6 +5,7 @@
 # Bypasses text generation entirely, returning calibrated outcome probabilities with zero output token usage.
 
 import os
+import re
 from dotenv import load_dotenv
 from google import genai
 
@@ -35,7 +36,7 @@ DEFAULT_ROUTING_CRITERIA = {
     "window_screen": "Inspecting active window content, memory dump reading, or analyzing the visual screen.",
     "file_process": "Launching programs, killing processes, checking network ports, opening folders, or finding files.",
     "power_standby": "Commands to sleep, nap, enter standby mode, lock the PC, or shut down.",
-    "web_research": "Real-world facts, current events, recent anime/movie releases, web searches, or PDF queries.",
+    "web_research": "Visiting websites, checking URLs or links, browsing web pages, online searches, real-world facts, current events, recent anime/movie releases, or PDF queries.",
     "notes_tasks": "Viewing, creating, updating, or deleting notes and to-dos in the local notes app."
 }
 
@@ -172,9 +173,22 @@ UNIVERSAL_TOOL_NAMES = [
 def prune_tools_for_prompt(user_input: str, all_tools_lookup: dict, default_tools: list) -> tuple[str, list, float]:
     """
     Dynamically prunes Kiko's 50+ tool schemas down to only the relevant subsystem for the user's prompt.
-    Uses gemini-decision-1 for sub-second intent classification.
+    Uses gemini-decision-1 for sub-second intent classification with local deterministic fast-paths.
     Returns: (chosen_category, pruned_tool_list, confidence)
     """
+    # Fast-path 1: Contextual retries or follow-ups ("try again", "look again", "retry")
+    # Retain all tools so the model is not deprived of whatever tool the previous turn utilized
+    if re.search(r'\b(try again|look again|search again|check again|retry|one more time|do it again|do that again|run again)\b', user_input, re.I):
+        return ("all_tools", default_tools, 1.0)
+
+    # Fast-path 2: Explicit URLs or web addresses directly route to web_research in 0ms
+    if re.search(r'https?://\S+|www\.\S+|\b[a-zA-Z0-9.-]+\.(?:com|org|net|dev|io|html|edu|gov)\b', user_input, re.I):
+        target_tool_names = set(CATEGORY_TOOL_MAPPING.get("web_research", []))
+        target_tool_names.update(UNIVERSAL_TOOL_NAMES)
+        pruned = [all_tools_lookup[name] for name in target_tool_names if name in all_tools_lookup]
+        if pruned:
+            return ("web_research", pruned, 1.0)
+
     routing = route_intent(user_input)
     category = routing.get("choice", "casual_chat")
     confidence = routing.get("confidence", 0.0)
