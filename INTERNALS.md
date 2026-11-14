@@ -7,7 +7,7 @@ The following text details the underlying mechanics and API hooks utilized withi
 Hardcoded intent routing is avoided. The architecture utilizes SDK-level function calling. A schema of available OS hooks is provided to the generative model. Upon receiving input, the model determines which native tool to invoke, mapping natural language to Win32/WinRT bindings. Execution results are piped back to the generative engine to format the final output.
 
 ## 2. Desktop Window Manager (DWM) Z-Order Traversal
-**File:** `tools.py` -> `get_active_window()`, `read_active_window_content()`
+**File:** `tools/windowing.py` -> `get_active_window()`, `read_active_window_content()`
 
 When executing a command-line interface, the "active window" defaults inherently to the terminal process. Deducing the actual target application requires ignoring the terminal wrapper and crawling the DWM Z-order stack.
 - A hook into `user32.dll` is established via `ctypes`.
@@ -17,7 +17,7 @@ When executing a command-line interface, the "active window" defaults inherently
 - Parsing the title of the underlying window permits extraction of active code editor filenames, facilitating filesystem traversal and raw disk reads.
 
 ## 3. WinRT System Media Transport Controls (SMTC)
-**File:** `tools/windowing.py` -> `control_system_media()`
+**File:** `tools/media.py` -> `control_system_media()`
 
 Modern media control is routed through the asynchronous WinRT pipeline rather than via simulated keypresses.
 - The `winsdk` projection accesses `Windows.Media.Control`.
@@ -244,12 +244,14 @@ To allow Kiko to natively manage personal notes, a dedicated API wrapper hooks d
 - **Raw Markdown Pass-Through**: The `notes-web` frontend features a mechanical intercept that converts raw markdown into an HTML AST. Kiko leverages this by generating pure markdown strings internally (including tables and checklists) and piping them directly into the JSON `content` field, completely eliminating the need to compile HTML server-side.
 - **Dual-Auth Injection**: Authenticates seamlessly by dynamically reading the `NOTES_API_KEY` from the local `.env` and forcefully injecting `x-api-key` headers into every outgoing request.
 
-## 25. Real-Time Model State Tracking & Dynamic Fallback
+## 25. Real-Time Model State Tracking, Transient Spike Retries & Dynamic Fallback
 **Files:** `tools/telemetry.py` -> `get_current_model()`, `main.py`, `server.py`, `ui/app.js`
 
-To prevent opaque LLM failures and maintain full operational transparency, Kiko exposes her active inference model across both the Terminal CLI and the WebUI.
-- **Dynamic Fallback Cascade**: Primary generation relies on high-speed models (`gemini-3.6-flash`), cascading sequentially across 10+ active models upon encountering HTTP 503, resource exhaustion, or quota rejections.
-- **Terminal Model Prompts**: The CLI boot sequence announces the active engine (`--- Kiko is waking up! [Active Model: gemini-3.6-flash] ---`), and dynamically updates the interactive input prompt (`[gemini-3.6-flash] > `) after any runtime fallback occurs.
+To prevent opaque LLM failures and maintain continuous availability, Kiko combines high-speed inference, proactive transient demand retries, and an automated multi-model fallback cascade across both the Terminal CLI and the WebUI.
+- **Verified Resilient Fallback Chain**: Primary generation begins on `gemini-3.5-flash-lite`, cascading down a strictly verified sequence of healthy endpoints (`gemini-3.5-flash`, `gemini-3.6-flash`, `gemini-3.1-flash-lite`, `gemma-4-26b-a4b-it`). Deprecated 404 models and unresponsive hanging endpoints are purged to ensure zero-latency failover.
+- **Transient Demand Spike Absorption Loop**: Rather than abruptly switching models upon the first momentary HTTP 503 or 504 congestion signal from Google, `send_with_fallback()` and the WebUI WebSocket loop enforce an in-place retry buffer (up to 5 retries with 2-second sleep intervals). This absorbs short-lived demand spikes and keeps the assistant anchored to the primary high-speed model without unnecessary context resets.
+- **Strict Client-Side Socket Deadline (15,000ms)**: To protect against unrecoverable remote deadlocks where an endpoint hangs silently on Google's infrastructure, `genai.Client` enforces a hard 15-second request timeout (`http_options={'timeout': 15000}`). If a model stalls, the socket is forcefully aborted, triggering an immediate cascade to the next fallback candidate.
+- **Terminal Model Prompts**: The CLI boot sequence announces the active engine (`--- Kiko is waking up! (Gemini 3.5 Flash-Lite) ---`), and dynamically updates the interactive input prompt after any runtime fallback occurs.
 - **WebSocket Reactive Pill & REST Reflection**: `server.py` exposes `GET /api/model` and broadcasts `model_info` payloads over WebSockets upon connection and during failover loops. The frontend reflects this via a floating model badge in the top bar, maintaining continuous awareness of model transitions without page reloads.
 - **Runtime Reflection Tooling**: The `get_current_model()` tool inspects `sys.modules['main']` dynamically at runtime, allowing Kiko to self-report her exact active model and chain position in conversation without hallucination.
 
