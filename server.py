@@ -192,6 +192,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                 import asyncio
                 
                 full_response_text = ""
+                retries_on_current_model = 0
+                max_retries = 5
                 
                 while True:
                     try:
@@ -264,6 +266,21 @@ async def websocket_endpoint(websocket: WebSocket, session_id: int):
                             "unavailable", "overloaded", "deadline", "timeout"
                         ])
                         if is_recoverable:
+                            is_transient_spike = any(term in err_str for term in [
+                                "503", "demand", "unavailable", "504", "deadline", "timeout", "500", "502", "overloaded"
+                            ])
+                            if is_transient_spike and retries_on_current_model < max_retries:
+                                retries_on_current_model += 1
+                                print(f"   [🔄 {main.model_name} hit temporary spike ({e}). Retrying in 2s ({retries_on_current_model}/{max_retries})...] (Web UI)")
+                                await websocket.send_json({
+                                    "type": "status",
+                                    "message": f"🔄 Retrying {format_model_name(main.model_name)} ({retries_on_current_model}/{max_retries})...",
+                                    "status": "running"
+                                })
+                                await asyncio.sleep(2)
+                                continue
+
+                            retries_on_current_model = 0
                             next_index = (main.current_model_index + 1) % len(main.model_fallback_chain)
                             next_model = main.model_fallback_chain[next_index]
                             

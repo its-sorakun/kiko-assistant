@@ -28,23 +28,16 @@ if not api_key or api_key == "your_new_api_key_goes_here":
     print("API key missing. Configure GEMINI_API_KEY in .env file.")
     exit()
 
-# Initialize the generative AI client
-client = genai.Client(api_key=api_key)
+# Initialize the generative AI client with a strict 15s socket timeout to prevent indefinite hangs
+client = genai.Client(api_key=api_key, http_options={'timeout': 15000})
 
 # Model configuration and fallback chain
-# Primary model is gemini-3.5-flash-lite with official Gemini 3 series and dynamic aliases as fallbacks
+# Primary model is gemini-3.5-flash-lite with verified healthy models in descending order
 model_fallback_chain = [
     'gemini-3.5-flash-lite',
+    'gemini-3.5-flash',
     'gemini-3.6-flash',
-    'gemini-3.8-flash',
     'gemini-3.1-flash-lite',
-    'gemini-3-flash-preview',
-    'gemini-3.1-pro-preview',
-    'gemini-omni-1.1-flash',
-    'gemini-flash-latest',
-    'gemini-flash-lite-latest',
-    'gemini-pro-latest',
-    'gemini-4-argon',
     'gemma-4-26b-a4b-it',
 ]
 current_model_index = 0
@@ -451,6 +444,9 @@ def main():
     def send_with_fallback(prompt_text, turn_tools=None):
         global chat, model_name, current_model_index, config
         import time
+        retries_on_current_model = 0
+        max_retries = 5
+
         while True:
             try:
                 if turn_tools is not None:
@@ -471,6 +467,18 @@ def main():
                     "unavailable", "overloaded", "deadline", "timeout"
                 ])
                 if is_recoverable:
+                    # If the error is a temporary demand spike or transient network delay, retry the current model up to 5 times
+                    is_transient_spike = any(term in err_str for term in [
+                        "503", "demand", "unavailable", "504", "deadline", "timeout", "500", "502", "overloaded"
+                    ])
+                    if is_transient_spike and retries_on_current_model < max_retries:
+                        retries_on_current_model += 1
+                        print(f"   [🔄 {tools.format_model_name(model_name)} hit temporary spike ({e}). Retrying in 2s ({retries_on_current_model}/{max_retries})...]")
+                        time.sleep(2)
+                        continue
+
+                    # Reset retry counter before cascading to the next model
+                    retries_on_current_model = 0
                     next_index = (current_model_index + 1) % len(model_fallback_chain)
                     next_model = model_fallback_chain[next_index]
                     print(f"   [⚠️ {tools.format_model_name(model_name)} failed ({e}). Falling back to {tools.format_model_name(next_model)}...]")
