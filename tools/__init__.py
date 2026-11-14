@@ -8,7 +8,7 @@ from .registry import query_registry_value
 from .media import control_system_media
 from .power import manage_power_state
 from .memory import memorize_preferences, get_all_preferences, recall_semantic_memory
-from .search import perform_web_search
+from .search import perform_web_search, fetch_webpage_content
 from .pdf_rag import advanced_pdf_query
 from .job_application_helper import draft_and_copy_job_email
 from .clipboard import copy_to_clipboard
@@ -41,6 +41,7 @@ __all__ = [
     "get_all_preferences",
     "recall_semantic_memory",
     "perform_web_search",
+    "fetch_webpage_content",
     "list_directory_contents",
     "open_file",
     "advanced_pdf_query",

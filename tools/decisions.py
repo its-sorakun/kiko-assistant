@@ -153,7 +153,7 @@ CATEGORY_TOOL_MAPPING = {
         "manage_power_state"
     ],
     "web_research": [
-        "perform_web_search", "advanced_pdf_query", "draft_and_copy_job_email", "copy_to_clipboard"
+        "perform_web_search", "fetch_webpage_content", "advanced_pdf_query", "draft_and_copy_job_email", "copy_to_clipboard"
     ],
     "notes_tasks": [
         "get_notes", "create_note", "update_note", "delete_note"
