@@ -34,7 +34,7 @@ DEFAULT_ROUTING_CRITERIA = {
     "weather": "Inquiries about weather conditions, temperature, rain warnings, or forecasts.",
     "system_hardware": "Checking CPU, GPU, RAM, storage drives, PC specs, hardware details, temperature, battery, or hardware specifications.",
     "window_screen": "Inspecting active window content, memory dump reading, or analyzing the visual screen.",
-    "file_process": "Launching programs, killing processes, checking network ports, opening folders, or finding files.",
+    "file_process": "Launching programs, killing processes, checking network ports, opening folders, finding files, or inspecting file/folder size and metadata.",
     "power_standby": "Commands to sleep, nap, enter standby mode, lock the PC, or shut down.",
     "web_research": "Visiting websites, checking URLs or links, browsing web pages, online searches, real-world facts, current events, recent anime/movie releases, or PDF queries.",
     "notes_tasks": "Viewing, creating, updating, or deleting notes and to-dos in the local notes app."
@@ -146,7 +146,7 @@ CATEGORY_TOOL_MAPPING = {
     ],
     "file_process": [
         "launch_program", "force_kill_process", "get_process_by_port", "kill_process_by_port",
-        "open_directory", "list_directory_contents", "open_file", "perform_global_search",
+        "open_directory", "list_directory_contents", "open_file", "inspect_path", "perform_global_search",
         "query_registry_value"
     ],
     "power_standby": [

@@ -1,55 +1,15 @@
-# tools/windowing.py - DWM Z-order stack traversal and filesystem navigation
+# tools/windowing.py - DWM Z-order stack traversal, UI Automation, and Direct Memory Scanning
+# Implementation details:
+# Interacts directly with user32.dll to crawl the Desktop Window Manager (DWM) Z-order stack,
+# deduces active application contexts beneath the terminal wrapper, reads accessible GUI elements
+# via Microsoft UIAutomation, and hooks target process heaps via a C++ direct memory scanner.
 
-# If the script runs in a terminal, the terminal inherently holds the "active" window focus. Drop down to user32.dll and crawl the Desktop Window Manager (DWM) Z-order stack downward to identify the actual underlying application.
 import ctypes
 import os
 import psutil
 
-def open_directory(folder_path: str) -> str:
-    """
-    Open a specific folder using the native Windows Explorer.
-    You can use '~' to represent the user's home directory (e.g., '~/Documents').
-    """
-    folder_path = os.path.expanduser(folder_path)
-    # Quick sanity check to make sure the folder actually exists
-    if os.path.exists(folder_path):
-        os.startfile(folder_path)
-        return f"Opened folder: {folder_path}"
-    else:
-        return f"Target directory does not exist: {folder_path}"
-
-def open_file(file_path: str) -> str:
-    """
-    Launch a specific file in its default associated application.
-    You can use '~' to represent the user's home directory (e.g., '~/Downloads/file.pdf').
-    """
-    file_path = os.path.expanduser(file_path)
-    if os.path.exists(file_path):
-        os.startfile(file_path)
-        return f"Opened file: {file_path}"
-    else:
-        return f"Target file does not exist: {file_path}"
-
-def list_directory_contents(folder_path: str) -> str:
-    """
-    List all files and subdirectories inside a given folder, returning the result as text.
-    Use this to 'see' what is inside a folder without opening it visually.
-    You can use '~' to represent the user's home directory (e.g., '~/Desktop').
-    """
-    folder_path = os.path.expanduser(folder_path)
-    if not os.path.exists(folder_path):
-        return f"Target directory does not exist: {folder_path}"
-    
-    try:
-        entries = os.listdir(folder_path)
-        if not entries:
-            return f"The directory '{folder_path}' is empty."
-        
-        return f"Contents of '{folder_path}':\n" + "\n".join(f"- {e}" for e in entries)
-    except PermissionError:
-        return f"Access Denied: Windows is preventing you from reading '{folder_path}'."
-    except Exception as e:
-        return f"Failed to list contents: {str(e)}"
+# Backward compatibility aliases for filesystem operations moved to tools.filesystem
+from .filesystem import open_directory, open_file, list_directory_contents
 
 def get_active_window() -> str:
     """
