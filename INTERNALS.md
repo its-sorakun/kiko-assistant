@@ -125,13 +125,17 @@ To prevent large PDF documents from saturating the LLM context window or crashin
 - **CPU-Optimized Embeddings**: Rather than making expensive API round-trips to Gemini to embed massive PDFs, the tool leverages `HuggingFaceEmbeddings` (`all-MiniLM-L6-v2`) via `sentence-transformers`. This generates ultra-fast, 384-dimensional dense vectors natively on the host's CPU.
 - **LangGraph Routing**: The sub-agent compiles a lightweight `StateGraph` which retrieves the top `k` semantically relevant chunks. These high-fidelity text segments are formatted and passed natively back into Kiko's main reasoning loop, enabling precise question-answering without exposing the parent model to the raw file bytes.
 
-## 11. Silent Filesystem Inspection
-**File:** `tools/windowing.py` -> `list_directory_contents()`
+## 11. Native Filesystem Inspection, Footprint Sizing & Separation of Concerns
+**File:** 	ools/filesystem.py -> inspect_path(), list_directory_contents(), open_directory(), open_file()
 
-Rather than aggressively launching visual GUI windows (via `os.startfile`) every time Kiko needs to examine a directory, a discrete parsing tool allows her to ingest folder contents silently.
-- Queries `os.listdir()` to enumerate physical file entries.
-- Returns a raw text payload directly into the LLM's context window.
-- **Contextual Optimization Loop**: If the LLM observes that a requested target file rests in the currently inspected directory, it bypasses the heavy global MFT scan. It constructs the absolute path natively in-memory and launches the target file instantaneously with zero intermediate graphical disruption.
+To enforce strict Separation of Concerns (SoC), filesystem and directory operations are decoupled from Desktop Window Manager (DWM) logic and isolated within 	ools/filesystem.py.
+- **Fast Win32 Kernel Enumeration (os.scandir)**: Avoids the performance and process-creation overhead of external helper executables. Uses Windows FindFirstFileW and FindNextFileW buffers (WIN32_FIND_DATAW) to read file sizes, timestamps, and attributes directly from kernel directory cache pages without redundant stat() syscalls.
+- **Deep Path Inspection (inspect_path)**:
+  - Automatically normalizes Windows environment variables (%TEMP%, %APPDATA%), user home paths (~), and conversational aliases (	emp, downloads, desktop).
+  - **Directories**: Recursively traverses directory trees to compute total byte size, file counts, and folder counts. Maintains an in-memory min-heap (heapq) to isolate and report the top 5 largest files consuming space.
+  - **Files**: Extracts exact byte sizes, file type extensions, timestamps (created, modified, accessed), and Win32 file attribute flags (Read-Only, Hidden, System, Archive, Reparse Points).
+- **Enriched Silent Inspection (list_directory_contents)**: Upgrades raw filename enumeration to formatted, typed listings ([DIR] vs [FILE]) with individual size strings and modification dates.
+- **GUI Application and Explorer Spawning**: open_directory and open_file route through os.startfile with path normalization to launch native Explorer and default Windows application handlers cleanly.
 
 ## 12. Universal Screen Reading (Direct Memory Hooking & UIA)
 **File:** `tools/windowing.py` -> `read_active_window_content()`
