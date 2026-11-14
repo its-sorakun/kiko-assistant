@@ -1,6 +1,7 @@
 # tools/vision.py - Multimodal frame buffer capture and vision model inference
 # Implementation details:
-# Interfaces with the DXGI screen capture daemon and coordinates Gemini vision queries.
+# Interfaces with the DXGI screen capture daemon, captures Windows desktop frames via IPC shared memory,
+# extracts local image files, and coordinates Gemini multimodal vision queries with model fallbacks and timeouts.
 
 import subprocess
 import os
@@ -11,7 +12,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key)
+client = genai.Client(api_key=api_key, http_options={'timeout': 15000})
 
 def analyze_screen(prompt: str) -> str:
     """
@@ -74,15 +75,9 @@ def analyze_screen(prompt: str) -> str:
     try:
         fallback_chain = [
             'gemini-3.6-flash',
-            'gemini-3.8-flash',
+            'gemini-3.5-flash',
             'gemini-3.5-flash-lite',
             'gemini-3.1-flash-lite',
-            'gemini-3-flash-preview',
-            'gemini-3.1-pro-preview',
-            'gemini-omni-1.1-flash',
-            'gemini-flash-latest',
-            'gemini-flash-lite-latest',
-            'gemini-pro-latest',
         ]
         response = None
         
@@ -107,28 +102,27 @@ def analyze_screen(prompt: str) -> str:
     except Exception as e:
         return f"Error analyzing screen: {str(e)}"
 
-def analyze_image(image_path: str, prompt: str) -> str:
+def analyze_image(image_path: str, prompt: str = "Analyze and describe this image in detail.") -> str:
     """
-    Analyzes an image file on disk and passes it to a vision LLM alongside your prompt.
-    Use this when the user explicitly uploads or attaches an image in the chat interface.
+    Analyzes an image file on disk and passes it to a vision LLM alongside the prompt.
+    Use this when an image file or attachment is provided or referenced.
     """
     try:
+        image_path = image_path.strip('\'"')
+        if not os.path.isabs(image_path):
+            image_path = os.path.abspath(image_path)
+
         if not os.path.exists(image_path):
             return f"Error: Image file not found at {image_path}"
             
+        print(f"\n   [🖼️ Kiko is inspecting image: {os.path.basename(image_path)}...]")
         img = Image.open(image_path)
         
         fallback_chain = [
             'gemini-3.6-flash',
-            'gemini-3.8-flash',
+            'gemini-3.5-flash',
             'gemini-3.5-flash-lite',
             'gemini-3.1-flash-lite',
-            'gemini-3-flash-preview',
-            'gemini-3.1-pro-preview',
-            'gemini-omni-1.1-flash',
-            'gemini-flash-latest',
-            'gemini-flash-lite-latest',
-            'gemini-pro-latest',
         ]
         response = None
         

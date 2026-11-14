@@ -33,7 +33,7 @@ DEFAULT_ROUTING_CRITERIA = {
     "spotify_music": "Playing, pausing, searching, controlling, or queuing music and playlists on Spotify.",
     "weather": "Inquiries about weather conditions, temperature, rain warnings, or forecasts.",
     "system_hardware": "Checking CPU, GPU, RAM, storage drives, PC specs, hardware details, temperature, battery, or hardware specifications.",
-    "window_screen": "Inspecting active window content, memory dump reading, or analyzing the visual screen.",
+    "window_screen": "Inspecting active window content, memory dump reading, analyzing the visual screen, or inspecting and analyzing image files, pictures, photos, screenshots, or visual attachments.",
     "file_process": "Launching programs, killing processes, checking network ports, opening folders, finding files, or inspecting file/folder size and metadata.",
     "power_standby": "Commands to sleep, nap, enter standby mode, lock the PC, or shut down.",
     "web_research": "Visiting websites, checking URLs or links, browsing web pages, online searches, real-world facts, current events, recent anime/movie releases, or PDF queries.",
@@ -142,7 +142,7 @@ CATEGORY_TOOL_MAPPING = {
         "connect_bluetooth_device", "toggle_bluetooth_power"
     ],
     "window_screen": [
-        "get_active_window", "read_active_window_content", "analyze_screen", "analyze_image"
+        "get_active_window", "read_active_window_content", "analyze_screen", "analyze_image", "perform_global_search"
     ],
     "file_process": [
         "launch_program", "force_kill_process", "get_process_by_port", "kill_process_by_port",
@@ -188,6 +188,16 @@ def prune_tools_for_prompt(user_input: str, all_tools_lookup: dict, default_tool
         pruned = [all_tools_lookup[name] for name in target_tool_names if name in all_tools_lookup]
         if pruned:
             return ("web_research", pruned, 1.0)
+
+    # Fast-path 3: Image attachments, image filenames/extensions, or visual queries route directly to window_screen
+    image_ext_regex = r'\.(?:png|jpe?g|webp|bmp|gif)\b'
+    visual_keywords_regex = r'\b(look at this|check this image|what is this image|clipboard image|see this image|inspect this picture|what do you see in this)\b'
+    if '[ATTACHMENT:' in user_input or re.search(image_ext_regex, user_input, re.I) or re.search(visual_keywords_regex, user_input, re.I):
+        target_tool_names = set(CATEGORY_TOOL_MAPPING.get("window_screen", []))
+        target_tool_names.update(UNIVERSAL_TOOL_NAMES)
+        pruned = [all_tools_lookup[name] for name in target_tool_names if name in all_tools_lookup]
+        if pruned:
+            return ("window_screen", pruned, 1.0)
 
     routing = route_intent(user_input)
     category = routing.get("choice", "casual_chat")
