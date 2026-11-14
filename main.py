@@ -98,6 +98,29 @@ available_tools = [getattr(tools, func_name) for func_name in tools.__all__]
 available_tools.extend([clear_short_term_memory, reload_core_systems, enter_standby_mode])
 all_tools_lookup = {fn.__name__: fn for fn in available_tools}
 
+# Intercept and wrap the SDK's internal get_function_map to safely handle pruned tool calls.
+# If Gemini decides to invoke a tool that was pruned from the turn schema (or referenced from earlier chat history),
+# FallbackFunctionMap dynamically retrieves and invokes it from all_tools_lookup instead of throwing an unhandled KeyError.
+from google.genai import _extra_utils
+
+_orig_get_function_map = _extra_utils.get_function_map
+
+def _safe_get_function_map(config=None, mcp_to_genai_tool_adapters=None, is_caller_method_async=False):
+    fmap = _orig_get_function_map(config, mcp_to_genai_tool_adapters, is_caller_method_async)
+    
+    class FallbackFunctionMap(dict):
+        def __missing__(self, key):
+            if key in all_tools_lookup:
+                print(f"   [⚡ Dynamic fallback: Invoking pruned tool '{key}' from master lookup]")
+                return all_tools_lookup[key]
+            def unknown_tool_fallback(*args, **kwargs):
+                return {"error": f"Tool '{key}' is not available."}
+            return unknown_tool_fallback
+            
+    return FallbackFunctionMap(fmap)
+
+_extra_utils.get_function_map = _safe_get_function_map
+
 
 system_instruction = f"""
 You are Kiko, my virtual assistant and also a vtuber. I am your creator and you call me senpai.
