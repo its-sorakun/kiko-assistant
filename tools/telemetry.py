@@ -96,6 +96,35 @@ def _probe_static_hardware(force_refresh: bool = False) -> dict:
     except Exception as e:
         return {"error": f"Failed to probe static hardware via CIM: {e}"}
 
+def _resolve_amd_igpu_model(cpu_name: str) -> str:
+    """
+    Resolves the marketing model of AMD integrated graphics (e.g. Radeon 660M) when the
+    Windows driver INF genericizes the adapter name to 'AMD Radeon(TM) Graphics'.
+    Correlates the CPU generation and Compute Unit (CU) tier.
+    """
+    cpu_upper = cpu_name.upper()
+    # Rembrandt (Zen 3+ / RDNA 2) - 6000 and 7035 mobile series
+    if any(k in cpu_upper for k in ["7535", "6600"]):
+        return "AMD Radeon 660M (RDNA 2, 6 CUs)"
+    elif any(k in cpu_upper for k in ["7735", "7736", "6800", "6900", "6980"]):
+        return "AMD Radeon 680M (RDNA 2, 12 CUs)"
+    # Phoenix / Hawk Point (Zen 4 / RDNA 3) - 7040 and 8040 mobile series
+    elif any(k in cpu_upper for k in ["7540", "7640", "8540", "8640", "8645"]):
+        return "AMD Radeon 760M (RDNA 3, 8 CUs)"
+    elif any(k in cpu_upper for k in ["7840", "7940", "8840", "8845", "8945"]):
+        return "AMD Radeon 780M (RDNA 3, 12 CUs)"
+    # Strix Point (Zen 5 / RDNA 3.5)
+    elif "HX 370" in cpu_upper:
+        return "AMD Radeon 890M (RDNA 3.5, 16 CUs)"
+    elif "HX 365" in cpu_upper:
+        return "AMD Radeon 880M (RDNA 3.5, 12 CUs)"
+    # Cezanne / Barcelo / Renoir / Lucienne (Zen 3 / Zen 2 Vega)
+    elif any(k in cpu_upper for k in ["5600", "5500", "4600", "4500"]):
+        return "AMD Radeon Vega 7"
+    elif any(k in cpu_upper for k in ["5800", "5700", "4800", "4700"]):
+        return "AMD Radeon Vega 8"
+    return ""
+
 def get_hardware_details(force_refresh: bool = False) -> str:
     """
     Retrieve comprehensive hardware specifications and system architecture of the host PC.
@@ -131,6 +160,12 @@ def get_hardware_details(force_refresh: bool = False) -> str:
     gpu_descriptions = []
     for video in videos:
         name = video.get("Name", "Unknown")
+        # If Windows driver reports generic 'AMD Radeon(TM) Graphics', correlate with CPU to resolve exact iGPU marketing model
+        if "AMD Radeon" in name and ("Graphics" in name or "(TM)" in name):
+            resolved_igpu = _resolve_amd_igpu_model(proc.get("Name", ""))
+            if resolved_igpu:
+                name = resolved_igpu
+
         ram_bytes = video.get("AdapterRAM") or 0
         if ram_bytes > 0:
             ram_gb = round(ram_bytes / (1024 ** 3), 1)
@@ -189,6 +224,7 @@ def format_model_name(model_slug: str) -> str:
         'gemini-3.8-flash-tts': 'Gemini 3.8 Flash TTS',
         'gemini-3.8-flash-lite-tts': 'Gemini 3.8 Flash-Lite TTS',
         'gemini-3.6-flash': 'Gemini 3.6 Flash',
+        'gemini-3.5-flash': 'Gemini 3.5 Flash',
         'gemini-3.5-flash-lite': 'Gemini 3.5 Flash-Lite',
         'gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite',
         'gemini-nano-banana-2.1': 'Nano Banana 2.1',
