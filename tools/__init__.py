@@ -12,7 +12,7 @@ from .memory import memorize_preferences, get_all_preferences, recall_semantic_m
 from .search import perform_web_search, fetch_webpage_content
 from .pdf_rag import advanced_pdf_query
 from .job_application_helper import draft_and_copy_job_email
-from .clipboard import copy_to_clipboard
+from .clipboard import copy_to_clipboard, read_clipboard
 from .vision import analyze_screen, analyze_image
 from .mft_scanner import perform_global_search
 from .weather import get_current_weather, get_hourly_forcast, get_weekly_forcast
@@ -49,6 +49,7 @@ __all__ = [
     "advanced_pdf_query",
     "draft_and_copy_job_email",
     "copy_to_clipboard",
+    "read_clipboard",
     "analyze_screen",
     "analyze_image",
     "perform_global_search",

@@ -71,12 +71,16 @@ def analyze_screen(prompt: str) -> str:
     if use_gdi_fallback or img is None:
         from PIL import ImageGrab
         img = ImageGrab.grab(all_screens=True)
+
+    # Downscale multi-monitor / ultra-high-resolution screen captures if exceeding 2560px
+    if img and (img.width > 2560 or img.height > 2560):
+        img.thumbnail((2560, 2560), Image.Resampling.LANCZOS)
         
     try:
         fallback_chain = [
-            'gemini-3.6-flash',
-            'gemini-3.5-flash',
             'gemini-3.5-flash-lite',
+            'gemini-3.5-flash',
+            'gemini-3.6-flash',
             'gemini-3.1-flash-lite',
         ]
         response = None
@@ -88,8 +92,14 @@ def analyze_screen(prompt: str) -> str:
                 break # Success
             except Exception as e:
                 err_str = str(e).lower()
-                if "503" in err_str or "demand" in err_str or "not found" in err_str or "quota" in err_str or "429" in err_str:
-                    print(f"   [⚠️ {m} failed (High Demand/Unavailable). Falling back...]")
+                is_recoverable = any(term in err_str for term in [
+                    "503", "500", "502", "504", "demand", "not found", "quota",
+                    "429", "resource_exhausted", "internal", "server error",
+                    "unavailable", "overloaded", "deadline", "timeout"
+                ])
+                if is_recoverable:
+                    reason = "quota / demand limit" if ("quota" in err_str or "429" in err_str or "demand" in err_str) else "transient error"
+                    print(f"   [⚠️ {m} hit {reason}. Falling back...]")
                     continue
                 else:
                     return f"Error analyzing screen: {str(e)}"
@@ -118,10 +128,17 @@ def analyze_image(image_path: str, prompt: str = "Analyze and describe this imag
         print(f"\n   [🖼️ Kiko is inspecting image: {os.path.basename(image_path)}...]")
         img = Image.open(image_path)
         
+        # Optimize oversized images to prevent network upload saturation and socket timeouts
+        max_dimension = 2048
+        if img.width > max_dimension or img.height > max_dimension:
+            orig_size = (img.width, img.height)
+            img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+            print(f"   [⚡ Downscaled oversized image from {orig_size[0]}x{orig_size[1]} to {img.width}x{img.height} for rapid API inference]")
+
         fallback_chain = [
-            'gemini-3.6-flash',
-            'gemini-3.5-flash',
             'gemini-3.5-flash-lite',
+            'gemini-3.5-flash',
+            'gemini-3.6-flash',
             'gemini-3.1-flash-lite',
         ]
         response = None
@@ -133,8 +150,14 @@ def analyze_image(image_path: str, prompt: str = "Analyze and describe this imag
                 break # Success
             except Exception as e:
                 err_str = str(e).lower()
-                if "503" in err_str or "demand" in err_str or "not found" in err_str or "quota" in err_str or "429" in err_str:
-                    print(f"   [⚠️ {m} failed (High Demand/Unavailable) in analyze_image. Falling back...]")
+                is_recoverable = any(term in err_str for term in [
+                    "503", "500", "502", "504", "demand", "not found", "quota",
+                    "429", "resource_exhausted", "internal", "server error",
+                    "unavailable", "overloaded", "deadline", "timeout"
+                ])
+                if is_recoverable:
+                    reason = "quota / demand limit" if ("quota" in err_str or "429" in err_str or "demand" in err_str) else "transient error"
+                    print(f"   [⚠️ {m} hit {reason}. Falling back...]")
                     continue
                 else:
                     return f"Error analyzing image: {str(e)}"

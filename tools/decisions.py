@@ -142,7 +142,7 @@ CATEGORY_TOOL_MAPPING = {
         "connect_bluetooth_device", "toggle_bluetooth_power"
     ],
     "window_screen": [
-        "get_active_window", "read_active_window_content", "analyze_screen", "analyze_image", "perform_global_search"
+        "get_active_window", "read_active_window_content", "analyze_screen", "analyze_image", "perform_global_search", "read_clipboard"
     ],
     "file_process": [
         "launch_program", "force_kill_process", "get_process_by_port", "kill_process_by_port",
@@ -166,6 +166,7 @@ UNIVERSAL_TOOL_NAMES = [
     "reload_core_systems",
     "enter_standby_mode",
     "copy_to_clipboard",
+    "read_clipboard",
     "memorize_preferences",
     "get_all_preferences"
 ]
