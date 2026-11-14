@@ -24,8 +24,8 @@ Modern media control is routed through the asynchronous WinRT pipeline rather th
 - Because the global SMTC session is often dominated by web browsers, target applications are resolved explicitly.
 - By utilizing `manager.get_sessions()`, iteration over all suspended or background media sessions occurs. Comparing the `source_app_user_model_id` allows transport signals (play/pause) to be piped specifically to background applications, bypassing the dominant DWM session.
 
-## 4. WMI ACPI Probing & Native Telemetry
-**File:** `tools.py` -> `get_system_stats()`, `get_hardware_details()`
+## 4. WMI ACPI Probing, Hardware Inventory & Native Telemetry
+**File:** `tools/telemetry.py` -> `get_system_stats()`, `get_hardware_details()`
 
 Hardware telemetry is gathered by bypassing high-level wrappers and querying the Common Information Model (CIM) and Windows Management Instrumentation (WMI).
 - Central processing and memory metrics are extracted natively.
@@ -33,7 +33,11 @@ Hardware telemetry is gathered by bypassing high-level wrappers and querying the
 - The daemon dynamically loads the AMD Ryzen Master SDK (`Platform.dll`) to establish a persistent session with the official AMD Ring-0 kernel driver (`AMDRyzenMasterDriver.sys`).
 - To avoid the severe CPU penalty of cold-booting the kernel session and querying the hardware System Management Unit (SMU) upon every telemetry request, the C++ daemon is designed as a persistent background process. It is eagerly initialized by `main.py` during Kiko's boot sequence. The daemon polls the hardware natively every 3000ms and exposes the live temperature via a Memory Mapped File (Shared Memory), allowing the Python runtime to read the sensors instantaneously with zero overhead.
 - An independent Python background thread runs continuously alongside Kiko's LLM evaluation loop, monitoring the CPU's shared memory block and natively querying the GPU via `nvidia-smi`. By utilizing a Schmitt trigger pattern (hysteresis logic), it autonomously fires custom GDI warning overlays directly onto the screen when thermal thresholds are crossed, bypassing the blocking LLM `input()` prompt completely.
-- Native PowerShell `Get-CimInstance` queries remain in place as a generic fallback for exposing underlying hardware IDs and manufacturers.
+- **Deep Hardware Inventory Inspection (`get_hardware_details`)**:
+  - Rather than spawning individual PowerShell processes for every hardware metric, Kiko executes a single consolidated CIM query aggregating `Win32_ComputerSystem`, `Win32_BaseBoard`, `Win32_Processor`, `Win32_VideoController`, `Win32_PhysicalMemory`, and `Win32_DiskDrive` in one shot (`creationflags=0x08000000`).
+  - **In-Memory Static Caching**: Since physical hardware components remain static between reboots, the parsed CIM inventory is cached in memory (`_cached_hardware_specs`). Initial cold probe requires ~1.69s; all subsequent inquiries execute in **4ms**.
+  - **Dynamic Layering**: Live metrics (available RAM, real-time partition free/total space across `C:`, `D:`, `E:`, and battery percentage/AC charging status via `psutil`) are recalculated on demand with zero latency.
+  - **AMD iGPU Architecture Disambiguation**: AMD's unified Windows WHQL driver INF genericizes all Rembrandt mobile APUs (Device ID `0x1681`) to `"AMD Radeon(TM) Graphics"`. Kiko correlates the CPU processor model string (`Ryzen 5 7535HS` vs `Ryzen 7 7735HS`) and Compute Unit allocation (6 CUs vs 12 CUs) to accurately resolve the true marketing silicon model (`AMD Radeon 660M (RDNA 2, 6 CUs)` vs `Radeon 680M`).
 
 ### Telemetry Data Flow Architecture
 
@@ -101,6 +105,8 @@ To circumvent LLM hallucinations without relying on expensive, rate-limited thir
 - **Fragment Buffering:** Because `HTMLParser` fractures data streams upon encountering inner semantic tags (like `<b>` elements highlighting search terms), the state machine actively buffers raw string fragments into a continuous block in memory. It only appends the finalized, assembled snippet to the results array once the enclosing `<td>` tag formally terminates.
 - **Two-Stage Crawling:** Scraping snippets alone often lacks sufficient context. The `DuckDuckGoParser` additionally extracts the underlying `href` from the `<a class="result-link">` tag. The scraper then automatically initiates a secondary, deep-dive `GET` request (using the same forged headers) to download the target webpage's complete HTML payload.
 - **Event-Driven DOM Stripping:** To prevent the massive HTML overhead of target webpages from crashing the LLM's context window, a second state machine (`WebContentParser`) is deployed. Taking advantage of `HTMLParser`'s event-driven callback architecture, it flips a boolean flag upon encountering `<script>`, `<style>`, or metadata opening tags. The `handle_data` event actively ignores incoming streams while this flag is active, mechanically throwing away all backend code and styling rules on the fly with zero memory overhead. The resulting pure text is capped at 3000 characters and injected directly into Kiko's context window alongside the DuckDuckGo snippets.
+- **Direct Webpage Content Fetching (`fetch_webpage_content`)**: When presented with an explicit HTTP/HTTPS URL, search indexing queries frequently fail because static directories or recently created pages lack indexed search snippets. Kiko uses `fetch_webpage_content` to bypass the search engine entirely, directly downloading the target DOM with browser headers and routing it through `WebContentParser` to extract pure readable text up to 4000 characters.
+- **Transparent Search URL Redirection**: In the event that the LLM invokes `perform_web_search` with an explicit URL in the query string, regex filters (`https?://[^\s'"<>]+`) intercept the target address immediately and route execution straight to `fetch_webpage_content`, avoiding zero-result DuckDuckGo errors.
 
 ## 9. Global Master File Table (MFT) Scanner
 **File:** `tools/mft_scanner/fast_search.cpp`, `tools/mft_scanner/__init__.py` -> `perform_global_search()`
@@ -263,3 +269,7 @@ Passing monolithic tool schemas (50+ functions) on every LLM generation causes e
 - **Dynamic Tool Assembly**: Based on the resolved category, `prune_tools_for_prompt` filters Kiko's 50+ tool schemas down to only the relevant subsystem (typically 4–12 functions) plus universal core utilities (`clear_short_term_memory`, `reload_core_systems`, `enter_standby_mode`, `copy_to_clipboard`).
 - **Fail-Safe Fallback**: If the classifier encounters an API error, network timeout, or confidence score below 0.60, the system automatically falls back to Kiko's full tool array, ensuring uninterrupted operational resilience.
 - **Self-Aware Architecture**: Kiko's system instruction informs her of this dual-engine design, allowing her to understand and explain her own behind-the-scenes tool routing to the user.
+- **Deterministic Regex Fast-Paths**: To avoid latency overhead on unambiguous intents, `prune_tools_for_prompt` includes local regex filters:
+  - URLs and domain patterns route directly to the `web_research` cluster in 0ms with 100% confidence.
+  - Follow-up or retry commands (`try again`, `look again`, `retry`) retain the full tool array so the model is not deprived of tools utilized in previous conversational turns.
+- **Dynamic Tool Schema Fallback (`FallbackFunctionMap`)**: When turn-level pruning removes tools from the active schema, the Google GenAI SDK can crash with `KeyError` if the model references a pruned tool from conversational history. Kiko wraps `_extra_utils.get_function_map` with `FallbackFunctionMap`, which intercepts `__missing__` keys and dynamically retrieves the requested function pointer from `all_tools_lookup` without throwing an exception.
