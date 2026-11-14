@@ -26,6 +26,7 @@ md/
 not_relavant/
 .cache
 push-script.ps1
+appearance/
 
 # Visual Studio Build Artifacts (C++ cpu_monitor)
 .vs/
