@@ -32,7 +32,7 @@ DEFAULT_ROUTING_CRITERIA = {
     "casual_chat": "Normal conversation, chit-chat, greetings, feelings, anime, or questions requiring no tool execution.",
     "spotify_music": "Playing, pausing, searching, controlling, or queuing music and playlists on Spotify.",
     "weather": "Inquiries about weather conditions, temperature, rain warnings, or forecasts.",
-    "system_hardware": "Checking CPU usage, GPU temperature, RAM consumption, or hardware specs.",
+    "system_hardware": "Checking CPU, GPU, RAM, storage drives, PC specs, hardware details, temperature, battery, or hardware specifications.",
     "window_screen": "Inspecting active window content, memory dump reading, or analyzing the visual screen.",
     "file_process": "Launching programs, killing processes, checking network ports, opening folders, or finding files.",
     "power_standby": "Commands to sleep, nap, enter standby mode, lock the PC, or shut down.",

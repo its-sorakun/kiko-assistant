@@ -1,8 +1,13 @@
-# tools/telemetry.py - Hardware telemetry probing and thermal sensor extraction
+# tools/telemetry.py - Hardware telemetry probing, inventory inspection, and thermal sensor extraction
 # Implementation details:
-# Probes hardware vitals, thermal shared memory, and coordinates runtime AI model inspection and switching.
+# Probes hardware vitals, queries Common Information Model (CIM) and psutil for detailed system specifications,
+# extracts CPU thermal metrics via shared memory IPC from a C++ driver daemon, reads GPU status via nvidia-smi,
+# and coordinates runtime AI model inspection and switching.
 
 # Grabbing CPU/RAM via psutil is straightforward, but thermal data is restricted in Windows user-space. Attempting to probe ACPI thermal zones natively via WMI here. Be aware that without a Ring-0 kernel driver, most modern desktop motherboards will silently block this read.
+import json
+import os
+import platform
 import psutil
 import subprocess
 
@@ -53,18 +58,123 @@ def get_system_stats() -> str:
     
     return f"CPU Usage: {cpu_usage}% (Temp: {cpu_temp}). RAM: {used_ram_gb}GB / {total_ram_gb}GB ({ram.percent}%). GPU Temp: {gpu_temp}"
 
-def get_hardware_details() -> str:
+# In-memory cache for static hardware specifications to avoid repetitive 2-second CIM process spawns
+_cached_hardware_specs = None
+
+def _probe_static_hardware(force_refresh: bool = False) -> dict:
     """
-    Retrieve underlying hardware specifications bypassing high-level wrappers.
-    Queries the Common Information Model (CIM) for read-only hardware data.
+    Queries the Windows Common Information Model (CIM) via PowerShell to retrieve static hardware specifications.
+    Consolidates computer system, motherboard, processor, video controllers, physical memory sticks, and
+    storage drives into a single JSON payload to minimize process spawn overhead.
     """
+    global _cached_hardware_specs
+    if _cached_hardware_specs is not None and not force_refresh:
+        return _cached_hardware_specs
+
+    script = (
+        "@{"
+        "Computer = Get-CimInstance Win32_ComputerSystem | Select-Object Manufacturer, Model; "
+        "Motherboard = Get-CimInstance Win32_BaseBoard | Select-Object Manufacturer, Product; "
+        "Processor = Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed; "
+        "Video = @(Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM, DriverVersion); "
+        "Memory = @(Get-CimInstance Win32_PhysicalMemory | Select-Object Manufacturer, Capacity, Speed, PartNumber); "
+        "Disks = @(Get-CimInstance Win32_DiskDrive | Select-Object Model, Size, MediaType) "
+        "} | ConvertTo-Json -Depth 3"
+    )
+
     try:
-        # Request read-only hardware specifications directly from the OS
-        cmd = ["powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_BaseBoard | Select-Object Manufacturer, Product | ConvertTo-Json -Compress"]
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        return f"Hardware CIM Data: {result.stdout.strip()}"
-    except subprocess.CalledProcessError as e:
-        return f"Failed to retrieve hardware details: {e.stderr}"
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", script],
+            capture_output=True,
+            text=True,
+            check=True,
+            creationflags=0x08000000  # CREATE_NO_WINDOW
+        )
+        data = json.loads(result.stdout)
+        _cached_hardware_specs = data
+        return data
+    except Exception as e:
+        return {"error": f"Failed to probe static hardware via CIM: {e}"}
+
+def get_hardware_details(force_refresh: bool = False) -> str:
+    """
+    Retrieve comprehensive hardware specifications and system architecture of the host PC.
+    Returns details on CPU (model, cores, threads), GPUs (dedicated and integrated, VRAM), RAM (total, speed, sticks),
+    storage drives (models, partitions, free space), machine model (laptop or desktop chassis), OS, and battery status.
+    Uses in-memory caching to return specs instantly after the initial probe. Set force_refresh=True to re-probe.
+    """
+    raw = _probe_static_hardware(force_refresh=force_refresh)
+    if "error" in raw:
+        return raw["error"]
+
+    def _ensure_list(val):
+        if isinstance(val, list):
+            return val
+        if isinstance(val, dict):
+            return [val]
+        return []
+
+    comp = raw.get("Computer") or {}
+    proc = raw.get("Processor") or {}
+    videos = _ensure_list(raw.get("Video"))
+    mems = _ensure_list(raw.get("Memory"))
+    disks = _ensure_list(raw.get("Disks"))
+
+    output_lines = [
+        "=== SYSTEM HARDWARE SPECIFICATIONS ===",
+        f"Host System: {comp.get('Manufacturer', 'Unknown')} {comp.get('Model', 'Unknown')}",
+        f"OS: {platform.system()} {platform.release()} (Build {platform.version()}) [{platform.machine()}]",
+        f"CPU: {proc.get('Name', 'Unknown').strip()}",
+        f"   -> Cores: {proc.get('NumberOfCores', 'N/A')} Physical | Threads: {proc.get('NumberOfLogicalProcessors', 'N/A')} Logical"
+    ]
+
+    gpu_descriptions = []
+    for video in videos:
+        name = video.get("Name", "Unknown")
+        ram_bytes = video.get("AdapterRAM") or 0
+        if ram_bytes > 0:
+            ram_gb = round(ram_bytes / (1024 ** 3), 1)
+            vram_label = f"{ram_gb}GB VRAM" if ram_gb >= 1 else f"{round(ram_bytes / (1024 ** 2))}MB VRAM"
+        else:
+            vram_label = "Shared VRAM"
+        gpu_descriptions.append(f"{name} ({vram_label})")
+    output_lines.append("GPU(s): " + (" | ".join(gpu_descriptions) if gpu_descriptions else "None detected"))
+
+    # Live memory metrics from psutil combined with physical stick descriptors from CIM
+    vm = psutil.virtual_memory()
+    total_ram = round(vm.total / (1024 ** 3), 1)
+    avail_ram = round(vm.available / (1024 ** 3), 1)
+    output_lines.append(f"RAM: {total_ram}GB Installed ({avail_ram}GB Currently Available)")
+    for i, mem in enumerate(mems, 1):
+        cap = round((mem.get("Capacity") or 0) / (1024 ** 3), 1)
+        speed = mem.get("Speed", "N/A")
+        mfg = (mem.get("Manufacturer") or "Unknown").strip()
+        part = (mem.get("PartNumber") or "").strip()
+        output_lines.append(f"   -> Slot {i}: {cap}GB @ {speed}MT/s ({mfg} {part})")
+
+    output_lines.append("Storage Drives & Partitions:")
+    for disk in disks:
+        size_gb = round((disk.get("Size") or 0) / (1024 ** 3), 1)
+        output_lines.append(f"   -> Physical Drive: {disk.get('Model', 'Unknown')} ({size_gb}GB)")
+    for part in psutil.disk_partitions(all=False):
+        try:
+            usage = psutil.disk_usage(part.mountpoint)
+            output_lines.append(
+                f"   -> Partition {part.device} ({part.fstype}): "
+                f"{usage.free / (1024 ** 3):.1f}GB Free / {usage.total / (1024 ** 3):.1f}GB Total "
+                f"({100 - usage.percent:.1f}% free)"
+            )
+        except Exception:
+            pass
+
+    battery = psutil.sensors_battery()
+    if battery:
+        state = "AC Power Connected" if battery.power_plugged else "Running on Battery"
+        output_lines.append(f"Power: Battery at {battery.percent}% ({state})")
+    else:
+        output_lines.append("Power: Desktop AC (No battery)")
+
+    return "\n".join(output_lines)
 
 def format_model_name(model_slug: str) -> str:
     """
