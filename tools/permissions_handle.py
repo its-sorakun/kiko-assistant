@@ -1,49 +1,107 @@
-# Could have used C++ but I chose python, but Why Python winreg instead of C++ WinRT?
-# I did some online research and found out that Windows permissions (Location, Camera, Mic) are enforced by the Capability Access Manager Service (camsvc), which reads its policies directly from the ConsentStore registry hive and official WinRT APIs (e.g., AppCapability::RequestAccessAsync) only allow an application to request permission for itself, Microsoft does not expose a public C++ API to globally flip the master OS toggle for all applications.
-# The only native way to globally toggle the master OS switch (mimicking the Windows Settings UI) is to forcefully overwrite the ConsentStore keys. 
-# Doing this in C++ merely acts as a wrapper around RegOpenKeyEx/RegSetValueEx, which introduces compilation overhead without exposing any lower-level kernel behavior. 
-# Python's built-in winreg hits the exact same configuration store natively with zero ceremony, using C++ to achieve the same result would be nothing but over engineering.
+# tools/permissions_handle.py - Windows Capability Access Manager permission controller
+# Implementation details:
+# Interacts directly with the Windows ConsentStore registry keys across HKLM and HKCU to query and toggle
+# system-wide hardware and privacy capabilities (webcam, microphone, location) without external binaries.
 
 import winreg
 
+CAPABILITY_ALIASES = {
+    "camera": "webcam",
+    "cam": "webcam",
+    "webcam": "webcam",
+    "video": "webcam",
+    "mic": "microphone",
+    "microphone": "microphone",
+    "audio": "microphone",
+    "location": "location",
+    "gps": "location",
+    "bluetooth": "bluetooth",
+    "radios": "radios",
+    "radio": "radios",
+    "contacts": "contacts",
+    "calendar": "appointments",
+    "appointments": "appointments",
+    "diagnostics": "appDiagnostics",
+    "appdiagnostics": "appDiagnostics",
+    "activity": "activity",
+    "phone": "phoneCall",
+    "phonecall": "phoneCall",
+    "cellular": "cellularData",
+    "cellulardata": "cellularData",
+    "documents": "documentsLibrary",
+    "pictures": "picturesLibrary",
+    "videos": "videosLibrary"
+}
+
+def resolve_capability_key(capability: str) -> str:
+    """Normalizes natural capability names to the underlying Windows ConsentStore subkey."""
+    clean_name = capability.strip().lower()
+    return CAPABILITY_ALIASES.get(clean_name, clean_name)
+
 def get_windows_permission_status(capability: str) -> bool:
     """
-    Checks if Windows permissions for a specific capability (e.g., 'location', 'webcam', 'microphone') 
-    are natively enabled across both the device and current user levels.
+    Checks if Windows permissions for a specific capability (e.g., 'camera', 'location', 'microphone') 
+    are natively enabled across either the device or user levels.
     """
+    target = resolve_capability_key(capability)
+    status = False
+    
+    # Check HKLM
     try:
-        # Check global device setting (HKLM)
-        key_lm = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, fr"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\{capability}")
+        key_lm = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, fr"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\{target}")
         val_lm, _ = winreg.QueryValueEx(key_lm, "Value")
-        
-        # Check per-user setting (HKCU)
-        key_cu = winreg.OpenKey(winreg.HKEY_CURRENT_USER, fr"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\{capability}")
-        val_cu, _ = winreg.QueryValueEx(key_cu, "Value")
-        
-        return val_lm == "Allow" and val_cu == "Allow"
+        winreg.CloseKey(key_lm)
+        if val_lm == "Allow":
+            status = True
     except Exception:
-        # Default to False if the keys don't exist or are completely locked down
-        return False
+        pass
+        
+    # Check HKCU
+    try:
+        key_cu = winreg.OpenKey(winreg.HKEY_CURRENT_USER, fr"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\{target}")
+        val_cu, _ = winreg.QueryValueEx(key_cu, "Value")
+        winreg.CloseKey(key_cu)
+        if val_cu == "Allow":
+            status = True
+    except Exception:
+        pass
+
+    return status
 
 def toggle_windows_permission(capability: str, enable: bool) -> str:
     """
-    Toggles native Windows permission for a specific capability (e.g., 'location', 'webcam', 'microphone')
+    Toggles native Windows permission for a specific capability (e.g., 'camera', 'webcam', 'microphone', 'location')
     for both the device (HKLM) and the current user (HKCU) via the Registry.
     Pass True to enable, False to disable.
     """
+    target = resolve_capability_key(capability)
     action = "Enabling" if enable else "Disabling"
-    print(f"   [🔧 Kiko is {action} Windows '{capability}' Permissions in the Registry...]")
+    val = "Allow" if enable else "Deny"
+    print(f"   [🔧 Kiko is {action} Windows '{capability}' (registry key: {target}) permissions...]")
+    
+    success_scopes = []
+    errors = []
+    
+    # Toggle Global Device Level (HKLM)
     try:
-        val = "Allow" if enable else "Deny"
-        
-        # Toggle Global Device Level (HKLM)
-        key_lm = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, fr"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\{capability}", 0, winreg.KEY_SET_VALUE)
+        key_lm = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, fr"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\{target}", 0, winreg.KEY_SET_VALUE)
         winreg.SetValueEx(key_lm, "Value", 0, winreg.REG_SZ, val)
-        
-        # Toggle Per-User Level (HKCU)
-        key_cu = winreg.OpenKey(winreg.HKEY_CURRENT_USER, fr"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\{capability}", 0, winreg.KEY_SET_VALUE)
-        winreg.SetValueEx(key_cu, "Value", 0, winreg.REG_SZ, val)
-        
-        return f"'{capability}' permissions successfully set to: {'Allow' if enable else 'Deny'} (Device and User levels)"
+        winreg.CloseKey(key_lm)
+        success_scopes.append("Device (HKLM)")
     except Exception as e:
-        return f"Failed to modify '{capability}' permissions: {str(e)}"
+        errors.append(f"Device: {e}")
+        
+    # Toggle Per-User Level (HKCU)
+    try:
+        key_cu = winreg.OpenKey(winreg.HKEY_CURRENT_USER, fr"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\{target}", 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(key_cu, "Value", 0, winreg.REG_SZ, val)
+        winreg.CloseKey(key_cu)
+        success_scopes.append("User (HKCU)")
+    except Exception as e:
+        errors.append(f"User: {e}")
+        
+    if success_scopes:
+        scopes_str = " and ".join(success_scopes)
+        return f"'{capability}' permissions successfully set to '{val}' across {scopes_str}."
+    else:
+        return f"Failed to modify '{capability}' permissions. Registry errors: {'; '.join(errors)}"

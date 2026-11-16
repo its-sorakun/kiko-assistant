@@ -32,7 +32,7 @@ DEFAULT_ROUTING_CRITERIA = {
     "casual_chat": "Normal conversation, chit-chat, greetings, feelings, anime, or questions requiring no tool execution.",
     "spotify_music": "Playing, pausing, searching, controlling, or queuing music and playlists on Spotify.",
     "weather": "Inquiries about weather conditions, temperature, rain warnings, or forecasts.",
-    "system_hardware": "Checking CPU, GPU, RAM, storage drives, PC specs, hardware details, temperature, battery, or hardware specifications.",
+    "system_hardware": "Checking CPU, GPU, RAM, storage drives, PC specs, hardware details, temperature, battery, hardware specifications, or managing Windows permissions (camera, microphone, location).",
     "window_screen": "Inspecting active window content, memory dump reading, analyzing the visual screen, or inspecting and analyzing image files, pictures, photos, screenshots, or visual attachments.",
     "file_process": "Launching programs, killing processes, checking network ports, opening folders, finding files, or inspecting file/folder size and metadata.",
     "power_standby": "Commands to sleep, nap, enter standby mode, lock the PC, or shut down.",
@@ -139,7 +139,7 @@ CATEGORY_TOOL_MAPPING = {
     "system_hardware": [
         "get_system_stats", "get_hardware_details", "get_current_model",
         "list_available_models", "switch_ai_model", "get_bluetooth_devices",
-        "connect_bluetooth_device", "toggle_bluetooth_power"
+        "connect_bluetooth_device", "toggle_bluetooth_power", "toggle_windows_permission"
     ],
     "window_screen": [
         "get_active_window", "read_active_window_content", "analyze_screen", "analyze_image", "perform_global_search", "read_clipboard"
